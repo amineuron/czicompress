@@ -13,6 +13,20 @@ using System.IO.Abstractions.TestingHelpers;
 public class TemporaryFileTests
 {
     [Fact]
+    public void CleanupPreservesAnUnrelatedFinalDestinationFile()
+    {
+        var fs = new MockFileSystem();
+        fs.AddFile("destination.czi", new MockFileData("valuable existing destination"));
+        var temporary = new TemporaryFile(fs.FileInfo.New("destination.czi"));
+        fs.AddFile(temporary.Info.FullName, new MockFileData("our partial output"));
+
+        temporary.DeleteAllOutFiles();
+
+        fs.File.ReadAllText("destination.czi").Should().Be("valuable existing destination");
+        fs.File.Exists(temporary.Info.FullName).Should().BeFalse();
+    }
+
+    [Fact]
     public void WhenNoOutputFileExist_CreationOfTemporaryOutputDirSucceeds()
     {
         // ARRANGE
