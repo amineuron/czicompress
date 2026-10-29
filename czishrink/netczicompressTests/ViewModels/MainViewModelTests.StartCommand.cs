@@ -166,7 +166,7 @@ public partial class MainViewModelTests
 
     [Theory]
     [AutoData]
-    public async Task StartCommands_WhenProcessingStarts_UsesCorrectParameters(OperationMode selectedMode, bool recursive)
+    public async Task StartCommands_WhenProcessingStarts_UsesCorrectParameters(OperationMode selectedMode, bool recursive, bool copyOtherFiles)
     {
         // ARRANGE
         IFixture fixture = CreateFixture();
@@ -178,6 +178,7 @@ public partial class MainViewModelTests
         SetFolders(sut, fs);
         sut.SelectedMode = selectedMode;
         sut.Recursive = recursive;
+        sut.CopyOtherFiles = copyOtherFiles;
 
         // ACT
         var startCommandTask = sut.StartCommand.Execute(default).ToTask();
@@ -191,7 +192,8 @@ public partial class MainViewModelTests
                         object.ReferenceEquals(x.InputDir.FileSystem, fs) &&
                         object.ReferenceEquals(x.OutputDir.FileSystem, fs) &&
                         x.Recursive == recursive &&
-                        x.Mode == selectedMode.Value),
+                        x.Mode == selectedMode.Value &&
+                        x.ProcessingOptions.CopyOtherFiles == copyOtherFiles),
                 It.Is<CancellationToken>(t => !t.IsCancellationRequested)),
             Times.Once);
 
@@ -223,7 +225,7 @@ public partial class MainViewModelTests
         // ASSERT
         loggerMock.VerifySingleEntry(
             Microsoft.Extensions.Logging.LogLevel.Information,
-            $"Starting run: FolderCompressorParameters {{ InputDir = {sut.InputDirectory}, OutputDir = {sut.OutputDirectory}, Recursive = {recursive}, Mode = {selectedMode.Value}, ExecutionOptions = ExecutionOptions {{ ThreadCount = {sut.ThreadCount} }}, ProcessingOptions = ProcessingOptions {{ CompressionLevel = {sut.CompressionLevel}, CopyFailedFiles = {sut.CopyFailedFiles} }} }}");
+            $"Starting run: FolderCompressorParameters {{ InputDir = {sut.InputDirectory}, OutputDir = {sut.OutputDirectory}, Recursive = {recursive}, Mode = {selectedMode.Value}, ExecutionOptions = ExecutionOptions {{ ThreadCount = {sut.ThreadCount} }}, ProcessingOptions = ProcessingOptions {{ CompressionLevel = {sut.CompressionLevel}, CopyFailedFiles = {sut.CopyFailedFiles}, CopyOtherFiles = {sut.CopyOtherFiles} }} }}");
 
         // CLEANUP
         await sut.StopCommand.Execute(default);

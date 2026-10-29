@@ -134,6 +134,10 @@ public class MainViewModel : ViewModelBase,
     public bool CopyFailedFiles { get; set; } = false;
 
     /// <inheritdoc/>
+    [Reactive]
+    public bool CopyOtherFiles { get; set; } = false;
+
+    /// <inheritdoc/>
     public IEnumerable Modes { get; }
 
     public bool CanStop => this.CanStopHelper.Value;
@@ -233,7 +237,7 @@ public class MainViewModel : ViewModelBase,
 
     private (ProcessingOptions ProcessingOptions, ExecutionOptions ExecutionOptions) CollectAdvancedCompressionOptions()
     {
-        ProcessingOptions processingOptions = new(this.CompressionLevel, this.CopyFailedFiles);
+        ProcessingOptions processingOptions = new(this.CompressionLevel, this.CopyFailedFiles, this.CopyOtherFiles);
         ExecutionOptions executionOptions = new(this.ThreadCount);
         return (processingOptions, executionOptions);
     }

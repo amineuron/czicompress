@@ -376,6 +376,11 @@ public class MultiThreadedFolderCompressorTests
             var error = GetErrorForFile(inputFile)?.Message;
             long expectedOutputSize = error == null ? fileInfo.Length * 2 : 0;
 
+            if (error != null && processingOptions.CopyFailedFiles)
+            {
+                error += " " + FileProcessingFailedHandler.FailedCopyMessage;
+            }
+
             if (inputFile.EndsWith("image-3.czi"))
             {
                 // output file exists
@@ -440,6 +445,7 @@ public class MultiThreadedFolderCompressorTests
             {
                 MatchExtensionCasing = MatchCasing.PlatformDefault, // CaseInsensitive is currently not supported by MockFileSystem
                 AttributesToSkip = FileAttributes.Hidden | FileAttributes.System, // AttributesToSkip is currently not supported by MockFileSystem
+                OtherFilesAttributesToSkip = FileAttributes.Hidden | FileAttributes.System,
             };
         }
         else
@@ -488,6 +494,7 @@ public class MultiThreadedFolderCompressorTests
             MatchExtensionCasing =
                 MatchCasing.PlatformDefault, // CaseInsensitive is currently not supported by MockFileSystem
             AttributesToSkip = FileAttributes.System | FileAttributes.Hidden, // AttributesToSkip is not supported by MockFileSystem
+            OtherFilesAttributesToSkip = FileAttributes.Hidden | FileAttributes.System,
         };
         return sut;
     }

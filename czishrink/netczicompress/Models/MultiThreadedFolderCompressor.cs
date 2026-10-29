@@ -30,9 +30,17 @@ public class MultiThreadedFolderCompressor(
     // Public only for testing. MockFileSystem does not support AttributesToSkip
     public FileAttributes AttributesToSkip { get; init; } = FileAttributes.Hidden;
 
+    // Public only for testing. MockFileSystem does not support skipping reparse points.
+    public FileAttributes OtherFilesAttributesToSkip { get; init; } = FileAttributes.ReparsePoint;
+
     /// <inheritdoc/>
     public IFolderCompressorRun PrepareNewRun(FolderCompressorParameters parameters, CancellationToken token)
     {
+        if (parameters.ProcessingOptions.CopyOtherFiles && SameDirectory(parameters.InputDir, parameters.OutputDir))
+        {
+            throw new ArgumentException("Input and output folders must be different when copying other files.", nameof(parameters));
+        }
+
         return new AsyncEnumerableToObservableActionAdapter<CompressorMessage>(CoreAsync(token), token);
 
         async IAsyncEnumerable<CompressorMessage> CoreAsync([EnumeratorCancellation] CancellationToken t = default)
@@ -44,10 +52,16 @@ public class MultiThreadedFolderCompressor(
             var maxNumberOfThreads = executionOptions.ThreadCount.Value;
 
             var processors = new List<IFileProcessor>(maxNumberOfThreads);
+            using IFileProcessor copyProcessor = mode == CompressionMode.NoOp
+                ? new NoOpFileProcessor()
+                : new CopyFileProcessor(inputDir.FileSystem);
+            var activeTasks = new List<Task<CompressorMessage.FileFinished>>(maxNumberOfThreads);
             try
             {
-                var activeTasks = new List<Task<CompressorMessage.FileFinished>>(maxNumberOfThreads);
-                await foreach (var file in this.EnumerateCzisAsync(inputDir, recursive, t).WithCancellation(t).ConfigureAwait(false))
+                var files = processingOptions.CopyOtherFiles
+                    ? this.EnumerateAllFilesAsync(inputDir, inputDir, outputDir, recursive, mode != CompressionMode.NoOp, t)
+                    : this.EnumerateCzisAsync(inputDir, recursive, t);
+                await foreach (var file in files.WithCancellation(t).ConfigureAwait(false))
                 {
                     if (file.CreationTimeUtc >= startTime)
                     {
@@ -89,11 +103,12 @@ public class MultiThreadedFolderCompressor(
                     {
                         try
                         {
+                            bool isCzi = string.Equals(thisFile.Extension, ".czi", StringComparison.OrdinalIgnoreCase);
                             return this.ProcessFile(
-                                p,
+                                isCzi ? p : copyProcessor,
                                 thisFile,
                                 outFile,
-                                processingOptions.CopyFailedFiles,
+                                isCzi && processingOptions.CopyFailedFiles,
                                 progressObservable.OnNext,
                                 t);
                         }
@@ -120,9 +135,18 @@ public class MultiThreadedFolderCompressor(
             }
             finally
             {
-                foreach (var processor in processors)
+                // Directory enumeration or creation can fail while files are still being processed.
+                // Wait for those tasks before releasing their native processors.
+                try
                 {
-                    processor.Dispose();
+                    await Task.WhenAll(activeTasks).ConfigureAwait(false);
+                }
+                finally
+                {
+                    foreach (var processor in processors)
+                    {
+                        processor.Dispose();
+                    }
                 }
             }
         }
@@ -154,6 +178,14 @@ public class MultiThreadedFolderCompressor(
         }
     }
 
+    private static bool SameDirectory(IDirectoryInfo first, IDirectoryInfo second)
+    {
+        return string.Equals(
+            Path.TrimEndingDirectorySeparator(first.FullName),
+            Path.TrimEndingDirectorySeparator(second.FullName),
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+    }
+
     private static async Task<int> WaitForTaskToComplete(IReadOnlyList<Task> tasks)
     {
         while (true)
@@ -178,6 +210,50 @@ public class MultiThreadedFolderCompressor(
         var outputPath = outputFileSystem.Path.Combine(outputDir.FullName, relativePath);
         var outFile = outputFileSystem.FileInfo.New(outputPath);
         return outFile;
+    }
+
+    private async IAsyncEnumerable<IFileInfo> EnumerateAllFilesAsync(
+        IDirectoryInfo folder,
+        IDirectoryInfo inputDir,
+        IDirectoryInfo outputDir,
+        bool recursive,
+        bool createDirectories,
+        [EnumeratorCancellation] CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (SameDirectory(folder, outputDir))
+        {
+            // Do not copy our own output or reports when the destination is inside the input tree.
+            yield break;
+        }
+
+        if (createDirectories)
+        {
+            var relativePath = inputDir.FileSystem.Path.GetRelativePath(inputDir.FullName, folder.FullName);
+            outputDir.FileSystem.Directory.CreateDirectory(outputDir.FileSystem.Path.Combine(outputDir.FullName, relativePath));
+        }
+
+        var opts = new EnumerationOptions
+        {
+            IgnoreInaccessible = true,
+            AttributesToSkip = this.OtherFilesAttributesToSkip,
+        };
+        await foreach (var file in folder.EnumerateFilesAsync("*", opts, token).ConfigureAwait(false))
+        {
+            yield return file;
+        }
+
+        if (recursive)
+        {
+            foreach (var directory in folder.EnumerateDirectories("*", opts))
+            {
+                await foreach (var file in this.EnumerateAllFilesAsync(
+                    directory, inputDir, outputDir, true, createDirectories, token).ConfigureAwait(false))
+                {
+                    yield return file;
+                }
+            }
+        }
     }
 
     private CompressorMessage.FileFinished ProcessFile(
@@ -224,7 +300,7 @@ public class MultiThreadedFolderCompressor(
             temporaryFile.MoveToOutFileIfExists();
             return MakeTheReturnValue(timeElapsed: elapsedTime, errorMessage: null);
         }
-        catch (Exception ex) when (ex is IOException or OperationCanceledException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
         {
             // Remove partially written file
             temporaryFile?.DeleteAllOutFiles();
