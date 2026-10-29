@@ -166,7 +166,8 @@ public partial class MainViewModelTests
 
     [Theory]
     [AutoData]
-    public async Task StartCommands_WhenProcessingStarts_UsesCorrectParameters(OperationMode selectedMode, bool recursive, bool copyOtherFiles)
+    public async Task StartCommands_WhenProcessingStarts_UsesCorrectParameters(
+        OperationMode selectedMode, bool recursive, bool copyOtherFiles, bool nikon, bool hdf5, bool tiff)
     {
         // ARRANGE
         IFixture fixture = CreateFixture();
@@ -179,6 +180,9 @@ public partial class MainViewModelTests
         sut.SelectedMode = selectedMode;
         sut.Recursive = recursive;
         sut.CopyOtherFiles = copyOtherFiles;
+        sut.ProcessNikonNd2 = nikon;
+        sut.ProcessHdf5 = hdf5;
+        sut.ProcessTiff = tiff;
 
         // ACT
         var startCommandTask = sut.StartCommand.Execute(default).ToTask();
@@ -193,7 +197,10 @@ public partial class MainViewModelTests
                         object.ReferenceEquals(x.OutputDir.FileSystem, fs) &&
                         x.Recursive == recursive &&
                         x.Mode == selectedMode.Value &&
-                        x.ProcessingOptions.CopyOtherFiles == copyOtherFiles),
+                        x.ProcessingOptions.CopyOtherFiles == copyOtherFiles &&
+                        x.ProcessingOptions.ProcessNikonNd2 == nikon &&
+                        x.ProcessingOptions.ProcessHdf5 == hdf5 &&
+                        x.ProcessingOptions.ProcessTiff == tiff),
                 It.Is<CancellationToken>(t => !t.IsCancellationRequested)),
             Times.Once);
 
@@ -223,9 +230,15 @@ public partial class MainViewModelTests
         var startCommandTask = sut.StartCommand.Execute(default).ToTask();
 
         // ASSERT
+        var expectedProcessingOptions = new ProcessingOptions(sut.CompressionLevel, sut.CopyFailedFiles, sut.CopyOtherFiles)
+        {
+            ProcessNikonNd2 = sut.ProcessNikonNd2,
+            ProcessHdf5 = sut.ProcessHdf5,
+            ProcessTiff = sut.ProcessTiff,
+        };
         loggerMock.VerifySingleEntry(
             Microsoft.Extensions.Logging.LogLevel.Information,
-            $"Starting run: FolderCompressorParameters {{ InputDir = {sut.InputDirectory}, OutputDir = {sut.OutputDirectory}, Recursive = {recursive}, Mode = {selectedMode.Value}, ExecutionOptions = ExecutionOptions {{ ThreadCount = {sut.ThreadCount} }}, ProcessingOptions = ProcessingOptions {{ CompressionLevel = {sut.CompressionLevel}, CopyFailedFiles = {sut.CopyFailedFiles}, CopyOtherFiles = {sut.CopyOtherFiles} }} }}");
+            $"Starting run: FolderCompressorParameters {{ InputDir = {sut.InputDirectory}, OutputDir = {sut.OutputDirectory}, Recursive = {recursive}, Mode = {selectedMode.Value}, ExecutionOptions = ExecutionOptions {{ ThreadCount = {sut.ThreadCount} }}, ProcessingOptions = {expectedProcessingOptions} }}");
 
         // CLEANUP
         await sut.StopCommand.Execute(default);

@@ -14,6 +14,42 @@ using System.Reactive.Threading.Tasks;
 public class CopyOtherFilesTests
 {
     [Fact]
+    public void FailedReadOnlyInputIsCopiedAndVerifiedWithoutWriteAccess()
+    {
+        string root = NewPath("readonly-fallback");
+        Directory.CreateDirectory(root);
+        string input = Path.Combine(root, "source.czi");
+        string output = Path.Combine(root, "destination.czi");
+        string temporary = output + "~";
+        File.WriteAllText(input, "read-only original");
+        File.SetAttributes(input, FileAttributes.ReadOnly);
+        try
+        {
+            var fs = new FileSystem();
+            var handler = new FileProcessingFailedHandler();
+            var message = handler.FileProcessingFailed(
+                fs.FileInfo.New(input),
+                fs.FileInfo.New(output),
+                fs.FileInfo.New(temporary),
+                _ => { },
+                "Unsupported CZI",
+                true,
+                CancellationToken.None);
+
+            message.Should().Contain(FileProcessingFailedHandler.SuccessfulCopyMessage);
+            File.ReadAllBytes(output).Should().Equal(File.ReadAllBytes(input));
+            handler.LastDetails!.ContainerByteIdentical.Should().BeTrue();
+            handler.LastDetails.InputSha256.Should().Be(handler.LastDetails.OutputSha256);
+            File.GetAttributes(input).Should().HaveFlag(FileAttributes.ReadOnly);
+        }
+        finally
+        {
+            File.SetAttributes(input, FileAttributes.Normal);
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
     public async Task CopyOtherFiles_RealFilesAndNativeCompressionProduceCompleteDestination()
     {
         string root = NewPath("real-files");

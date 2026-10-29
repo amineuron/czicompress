@@ -77,12 +77,12 @@ public class TemporaryFile
     }
 
     /// <summary>
-    /// Deletes the basic output file and the temporary file.
+    /// Deletes the file owned by this operation, including after a successful move.
     /// </summary>
     public void DeleteAllOutFiles()
     {
-        _ = this.TryDelete(this.OutFile);
         _ = this.TryDelete(this.Info);
+        this.OutFile.Refresh();
     }
 
     /// <summary>

@@ -30,4 +30,10 @@ public interface IAdvancedOptionsViewModel
     /// Gets or sets a value indicating whether non-CZI files and empty folders should also be copied.
     /// </summary>
     public bool CopyOtherFiles { get; set; }
+
+    public bool ProcessNikonNd2 { get; set; }
+
+    public bool ProcessHdf5 { get; set; }
+
+    public bool ProcessTiff { get; set; }
 }

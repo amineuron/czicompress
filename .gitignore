@@ -1,4 +1,6 @@
 # Prerequisites
+/artifacts/
+
 *.d
 
 # Compiled Object files

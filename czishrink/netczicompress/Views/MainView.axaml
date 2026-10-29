@@ -28,7 +28,7 @@
             <TextBlock
                 Grid.Row="0"
                 Margin="0,10,0,10"
-                Text="Compress CZI Files" />
+                Text="Compress scientific data files" />
 
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>

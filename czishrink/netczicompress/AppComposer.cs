@@ -54,7 +54,7 @@ public class AppComposer
         IFileProcessor CreateFileProcessor(CompressionMode mode, ProcessingOptions options) => mode switch
         {
             CompressionMode.NoOp => noOp,
-            _ => PInvokeFileProcessor.Create(mode, options),
+            _ => new MultiFormatFileProcessor(mode, options),
         };
         IFolderCompressor compressor = new MultiThreadedFolderCompressor(CreateFileProcessor, new FileProcessingFailedHandler());
 

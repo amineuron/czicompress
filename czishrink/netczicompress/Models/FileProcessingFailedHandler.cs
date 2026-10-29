@@ -9,10 +9,14 @@ using System.IO.Abstractions;
 /// <summary>
 /// A handler which deals with the case when a file processing fails.
 /// </summary>
-public class FileProcessingFailedHandler
+public class FileProcessingFailedHandler : IProcessingDetailsSource
 {
     public const string SuccessfulCopyMessage = "The file was copied as-is to the output folder.";
     public const string FailedCopyMessage = "The file could not be copied to the output folder.";
+
+    private readonly AsyncLocal<ProcessingDetails?> lastDetails = new();
+
+    public ProcessingDetails? LastDetails => this.lastDetails.Value;
 
     /// <summary>
     /// Handles the case when a file processing has failed.
@@ -35,9 +39,10 @@ public class FileProcessingFailedHandler
         bool copyFailedFile,
         CancellationToken cancellationToken)
     {
+        this.lastDetails.Value = null;
         if (copyFailedFile)
         {
-            return CopyFile(inFile, outFile, tempOutFile, reportProgress, cancellationToken)
+            return this.CopyFile(inFile, outFile, tempOutFile, reportProgress, cancellationToken)
                 ? $"{innerException} {SuccessfulCopyMessage}"
                 : $"{innerException} {FailedCopyMessage}";
         }
@@ -59,7 +64,7 @@ public class FileProcessingFailedHandler
         return true;
     }
 
-    private static bool CopyFile(
+    private bool CopyFile(
         IFileInfo inFile,
         IFileInfo outFile,
         IFileInfo tempOutFile,
@@ -68,46 +73,18 @@ public class FileProcessingFailedHandler
     {
         try
         {
-            CopyWithProgress(inFile.FullName, tempOutFile.FullName, reportProgress, cancellationToken);
+            using var copier = new CopyFileProcessor(new FileSystem());
+            copier.ProcessFile(inFile.FullName, tempOutFile.FullName, reportProgress, cancellationToken);
             tempOutFile.Refresh();
             tempOutFile.MoveTo(outFile.FullName);
+            this.lastDetails.Value = copier.LastDetails! with { Action = "Copied original after processing failure" };
             return true;
         }
         catch (Exception)
         {
             // Remove partially written file
-            _ = TryDelete(outFile);
             _ = TryDelete(tempOutFile);
             return false;
         }
-    }
-
-    private static void CopyWithProgress(
-        string inPath,
-        string outPath,
-        ReportProgress reportProgress,
-        CancellationToken cancellationToken)
-    {
-        long totalBytesWritten = 0;
-        int bufferLength = 1024 * 1024;
-        byte[] buffer = new byte[bufferLength];
-        using var inStream = new FileStream(inPath, FileMode.Open);
-        using var tempOutStream = new FileStream(outPath, FileMode.CreateNew);
-
-        int bytesRead = inStream.Read(buffer, 0, bufferLength);
-
-        do
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            tempOutStream.Write(buffer, 0, bytesRead);
-            totalBytesWritten += bytesRead;
-
-            int progress = inStream.Length != 0 ? (int)(((totalBytesWritten * 1.0) / inStream.Length) * 100) : 100;
-            reportProgress.Invoke(progress);
-
-            bytesRead = inStream.Read(buffer, 0, bufferLength);
-        }
-        while (bytesRead > 0);
     }
 }

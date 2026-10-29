@@ -6,6 +6,7 @@
 		<ApplicationIcon>..\netczicompress\Assets\netczicompress.ico</ApplicationIcon>
 		<AssemblyName>CziShrink</AssemblyName>
 		<Platforms>x64</Platforms>
+		<ScientificToolsDirectory Condition="'$(ScientificToolsDirectory)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\format-tools</ScientificToolsDirectory>
 	</PropertyGroup>
 	<ItemGroup>
 		<Content Include="..\LICENSE.txt" Link="LICENSE.txt">
@@ -19,6 +20,12 @@
 		</Content>
 	</ItemGroup>
 
+	<ItemGroup>
+		<Content Include="$(ScientificToolsDirectory)\**\*" Link="FormatTools\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" Exclude="$(ScientificToolsDirectory)\**\__pycache__\**;$(ScientificToolsDirectory)\**\*.pyc;$(ScientificToolsDirectory)\downloads\**;$(ScientificToolsDirectory)\*.py;$(ScientificToolsDirectory)\requirements*.txt" />
+		<Content Include="..\ScientificFormats\*.py" Link="FormatTools\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+		<Content Include="..\ScientificFormats\requirements*.txt" Link="FormatTools\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+		<Content Include="..\ScientificFormats\README.md" Link="FormatTools\README.md" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+	</ItemGroup>
 	<ItemGroup>
 		<PackageReference Include="Avalonia.Desktop" />
 		<PackageReference Include="Projektanker.Icons.Avalonia.FontAwesome" />

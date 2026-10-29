@@ -47,6 +47,8 @@ public class CsvLogFileWriter : IObserver<CompressorMessage.FileFinished>
 
     private static string ToLine(CompressorMessage.FileFinished value)
     {
+        var details = value.Details;
+        var format = details?.FileFormat ?? Path.GetExtension(value.InputFile.FullName).TrimStart('.').ToUpperInvariant();
         return Invariant(
                 $"{
                     Quote(value.InputFile.FullName)},{
@@ -56,7 +58,16 @@ public class CsvLogFileWriter : IObserver<CompressorMessage.FileFinished>
                     (value.ErrorMessage == null ? value.SizeDelta : string.Empty)},{
                     value.TimeElapsed?.ToString("c") ?? string.Empty},{
                     (value.ErrorMessage == null ? "SUCCESS" : "ERROR")},{
-                    Quote(value.ErrorMessage)}")
+                    Quote(value.ErrorMessage)},{
+                    Quote(format)},{
+                    Quote(details?.Operation)},{
+                    Quote(details?.Method)},{
+                    Quote(details?.Action)},{
+                    Quote(details?.Verification)},{
+                    details?.ContainerByteIdentical?.ToString() ?? string.Empty},{
+                    Quote(details?.InputSha256)},{
+                    Quote(details?.OutputSha256)},{
+                    Quote(details?.OutputFile)}")
                 + "\r\n";
     }
 
@@ -72,7 +83,7 @@ public class CsvLogFileWriter : IObserver<CompressorMessage.FileFinished>
 
     private void WriteHeader()
     {
-        this.Write("InputFile,SizeInput,SizeOutput,SizeRatio,SizeDelta,TimeToProcess,Status,ErrorMessage\r\n");
+        this.Write("InputFile,SizeInput,SizeOutput,SizeRatio,SizeDelta,TimeToProcess,Status,ErrorMessage,FileFormat,Operation,Method,Action,Verification,ContainerByteIdentical,InputSHA256,OutputSHA256,OutputFile\r\n");
     }
 
     private void Write(string line)

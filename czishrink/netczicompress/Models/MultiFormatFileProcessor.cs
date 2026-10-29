@@ -1,0 +1,51 @@
+// SPDX-FileCopyrightText: 2026 czicompress contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+namespace netczicompress.Models;
+
+/// <summary>
+/// Routes enabled scientific formats to their codecs, retaining the native CZI engine.
+/// </summary>
+public sealed class MultiFormatFileProcessor(CompressionMode mode, ProcessingOptions options) : IFileProcessor, IProcessingDetailsSource
+{
+    private readonly ScientificFileProcessor scientific = new(mode, options.CompressionLevel);
+    private IFileProcessor? czi;
+
+    public bool NeedsExistingOutputDirectory => true;
+
+    public ProcessingDetails? LastDetails { get; private set; }
+
+    public void ProcessFile(string inputPath, string outputPath, ReportProgress progressReport, CancellationToken token)
+    {
+        this.LastDetails = null;
+        if (string.Equals(Path.GetExtension(inputPath), ".czi", StringComparison.OrdinalIgnoreCase))
+        {
+            this.czi ??= PInvokeFileProcessor.Create(mode, options);
+            this.czi.ProcessFile(inputPath, outputPath, progressReport, token);
+            using var input = File.OpenRead(inputPath);
+            using var output = File.OpenRead(outputPath);
+            var inputSha = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(input));
+            var outputSha = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(output));
+            this.LastDetails = new ProcessingDetails(
+                "CZI",
+                mode.ToString(),
+                mode == CompressionMode.Decompress ? "Uncompressed" : "Zstandard",
+                mode == CompressionMode.Decompress ? "Decompressed" : "Processed by CZI engine",
+                "CZI lossless codec; decoded pixels not independently checked per file",
+                inputSha == outputSha,
+                inputSha,
+                outputSha);
+        }
+        else
+        {
+            this.scientific.ProcessFile(inputPath, outputPath, progressReport, token);
+            this.LastDetails = this.scientific.LastDetails;
+        }
+    }
+
+    public void Dispose()
+    {
+        this.czi?.Dispose();
+        this.scientific.Dispose();
+    }
+}

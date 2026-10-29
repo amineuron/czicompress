@@ -43,17 +43,37 @@ There is currently no way to manually set this.
 Input and output folders are selected, and the tool will operate on all CZI-documents within the input folder.
 The intent of the tool is to be a bulk-compression utility.
 
-Enable **Copy other files and folders** in the advanced options to also copy TIFFs and
-all other non-CZI files unchanged. The folder structure and empty folders are preserved;
+Enable **Copy other files and folders** in the advanced options to also copy files
+whose format is not selected for processing. The folder structure and empty folders are preserved;
 the subfolder setting controls whether nested folders are included. Existing destination
 files are skipped and reported in the error list and CSV. Copied files also appear in
 progress, the CSV report, and the overall statistics. Symbolic links and junctions are
 skipped, and an output folder inside the input tree is excluded from copying.
 Dry Run lists the selected files without copying files or creating their folders.
 
-**Copy CZI files that fail processing** is a separate option: it tries to copy the
-original CZI unchanged if compression or decompression fails. It does not control
-whether TIFFs or other file types are included.
+**Copy files that fail processing** is a separate option: it tries to copy the
+original unchanged if compression, decompression or verification fails. Copies
+are checked with SHA-256, and inputs are opened with read-only access.
+
+### Nikon ND2, HDF5 and TIFF
+
+In this custom build, the advanced options also offer **Process Nikon ND2**,
+**Process HDF5 (.h5, .hdf5)** and **Process TIFF / OME-TIFF**. They default to off.
+CZI remains enabled. New format codecs run locally from the bundled `FormatTools`
+folder, which must stay beside the executable. No separate Python installation
+or administrator access is required for the portable Windows build.
+
+ND2 uses lossless zlib image compression; HDF5 uses the official HDF5 tools with
+gzip and shuffle; TIFF uses lossless Deflate with suitable pixel predictors.
+These codecs use levels 1–9 (values outside that range are clamped), while CZI
+keeps its original Zstandard range. See [format support and limitations](ScientificFormats/README.md).
+
+**Decompress all data** also works for these selected formats. Decompressed pixels
+and dataset values must match exactly and metadata is verified. Repacking changes
+file layout and may change storage filters, so a decompressed container is not
+necessarily byte-identical to the original. Use a byte-preserving archive when
+exact restoration of the original file bytes is required. Inputs are never edited;
+outputs and CSV reports are written only to the selected destination.
 
 ## Parameters
 
@@ -109,6 +129,16 @@ the actual entries written.
 In some cases you may see no log output until the operation has completed if a reasonably constrained input directory is chosen.
 
 ### Format
+The first eight CSV columns remain unchanged. The report also appends
+`FileFormat`, `Operation`, `Method`, `Action`, `Verification`,
+`ContainerByteIdentical`, `InputSHA256`, `OutputSHA256` and `OutputFile`.
+The method and action describe what happened, including copying the original
+when compression would not save space. `ContainerByteIdentical` compares this
+operation's input and output file bytes; it is separate from decoded scientific
+data equivalence. `Verification` distinguishes checked pixels/datasets/metadata,
+verified byte copies, dry runs and the original CZI engine's lossless processing.
+The CZI engine is not independently decoded per file by this report.
+
 | InputFile        | SizeInput  | SizeOutput | SizeRatio   | SizeDelta | TimeToProcess    | Status  | ErrorMessage                                                        |
 |------------------|------------|------------|-------------|-----------|------------------|---------|---------------------------------------------------------------------|
 | Sample_file.czi  | 696480     | 564992     | 0.811210659 | 131488    | 00:00:00.0672709 | SUCCESS |                                                                     |
@@ -117,7 +147,7 @@ In some cases you may see no log output until the operation has completed if a r
 - Is the compression lossy?
   - The tool uses [Zstandard](https://github.com/facebook/zstd) which is a fast and lossless compression algorithm.
 - What happens to files that the tool is not able to compress? Are they still copied to the output folder?
-  - If **Copy CZI files that fail processing** is enabled, the app tries to copy the original CZI unchanged. The processing error is still logged, together with whether copying succeeded. Otherwise the failed CZI is not copied. Use **Copy other files and folders** to include TIFFs and other non-CZI files.
+  - If **Copy files that fail processing** is enabled, the app tries to copy the original unchanged. The processing error is still logged, together with whether copying succeeded. Otherwise the failed file is not copied. Use the format checkboxes to process ND2/HDF5/TIFF, and **Copy other files and folders** to include remaining accompanying files.
 
 
 ## Known Issues

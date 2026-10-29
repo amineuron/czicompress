@@ -138,6 +138,18 @@ public class MainViewModel : ViewModelBase,
     public bool CopyOtherFiles { get; set; } = false;
 
     /// <inheritdoc/>
+    [Reactive]
+    public bool ProcessNikonNd2 { get; set; }
+
+    /// <inheritdoc/>
+    [Reactive]
+    public bool ProcessHdf5 { get; set; }
+
+    /// <inheritdoc/>
+    [Reactive]
+    public bool ProcessTiff { get; set; }
+
+    /// <inheritdoc/>
     public IEnumerable Modes { get; }
 
     public bool CanStop => this.CanStopHelper.Value;
@@ -237,7 +249,12 @@ public class MainViewModel : ViewModelBase,
 
     private (ProcessingOptions ProcessingOptions, ExecutionOptions ExecutionOptions) CollectAdvancedCompressionOptions()
     {
-        ProcessingOptions processingOptions = new(this.CompressionLevel, this.CopyFailedFiles, this.CopyOtherFiles);
+        ProcessingOptions processingOptions = new(this.CompressionLevel, this.CopyFailedFiles, this.CopyOtherFiles)
+        {
+            ProcessNikonNd2 = this.ProcessNikonNd2,
+            ProcessHdf5 = this.ProcessHdf5,
+            ProcessTiff = this.ProcessTiff,
+        };
         ExecutionOptions executionOptions = new(this.ThreadCount);
         return (processingOptions, executionOptions);
     }

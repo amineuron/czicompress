@@ -36,7 +36,7 @@ public class MultiThreadedFolderCompressor(
     /// <inheritdoc/>
     public IFolderCompressorRun PrepareNewRun(FolderCompressorParameters parameters, CancellationToken token)
     {
-        if (parameters.ProcessingOptions.CopyOtherFiles && SameDirectory(parameters.InputDir, parameters.OutputDir))
+        if ((parameters.ProcessingOptions.CopyOtherFiles || parameters.ProcessingOptions.HasScientificFormats) && SameDirectory(parameters.InputDir, parameters.OutputDir))
         {
             throw new ArgumentException("Input and output folders must be different when copying other files.", nameof(parameters));
         }
@@ -52,17 +52,19 @@ public class MultiThreadedFolderCompressor(
             var maxNumberOfThreads = executionOptions.ThreadCount.Value;
 
             var processors = new List<IFileProcessor>(maxNumberOfThreads);
-            using IFileProcessor copyProcessor = mode == CompressionMode.NoOp
-                ? new NoOpFileProcessor()
-                : new CopyFileProcessor(inputDir.FileSystem);
             var activeTasks = new List<Task<CompressorMessage.FileFinished>>(maxNumberOfThreads);
             try
             {
-                var files = processingOptions.CopyOtherFiles
+                var files = processingOptions.CopyOtherFiles || processingOptions.HasScientificFormats
                     ? this.EnumerateAllFilesAsync(inputDir, inputDir, outputDir, recursive, mode != CompressionMode.NoOp, t)
                     : this.EnumerateCzisAsync(inputDir, recursive, t);
                 await foreach (var file in files.WithCancellation(t).ConfigureAwait(false))
                 {
+                    if (!processingOptions.CopyOtherFiles && !processingOptions.ProcessesExtension(file.Extension))
+                    {
+                        continue;
+                    }
+
                     if (file.CreationTimeUtc >= startTime)
                     {
                         // skip files that we may have created ourselves
@@ -103,14 +105,18 @@ public class MultiThreadedFolderCompressor(
                     {
                         try
                         {
-                            bool isCzi = string.Equals(thisFile.Extension, ".czi", StringComparison.OrdinalIgnoreCase);
+                            bool processFile = processingOptions.ProcessesExtension(thisFile.Extension);
+                            using IFileProcessor? copyProcessor = processFile ? null : mode == CompressionMode.NoOp
+                                ? new NoOpFileProcessor()
+                                : new CopyFileProcessor(inputDir.FileSystem);
                             return this.ProcessFile(
-                                isCzi ? p : copyProcessor,
+                                processFile ? p : copyProcessor!,
                                 thisFile,
                                 outFile,
-                                isCzi && processingOptions.CopyFailedFiles,
+                                processFile && processingOptions.CopyFailedFiles,
                                 progressObservable.OnNext,
-                                t);
+                                t,
+                                mode);
                         }
                         finally
                         {
@@ -262,10 +268,12 @@ public class MultiThreadedFolderCompressor(
         IFileInfo outFile,
         bool copyFailedFile,
         ReportProgress reportProgress,
-        CancellationToken token)
+        CancellationToken token,
+        CompressionMode mode)
     {
         TemporaryFile? temporaryFile = null;
         bool processedByProcessor = false;
+        ProcessingDetails? details = null;
         try
         {
             if (token.IsCancellationRequested)
@@ -295,6 +303,7 @@ public class MultiThreadedFolderCompressor(
             var temporaryOutFile = temporaryFile.Info;
             var startTimestamp = Stopwatch.GetTimestamp();
             processor.ProcessFile(inFile.FullName, temporaryOutFile.FullName, reportProgress, token);
+            details = (processor as IProcessingDetailsSource)?.LastDetails;
             processedByProcessor = true;
             var elapsedTime = Stopwatch.GetElapsedTime(startTimestamp);
             temporaryFile.MoveToOutFileIfExists();
@@ -312,22 +321,37 @@ public class MultiThreadedFolderCompressor(
 
             // We only cover those exceptions, that have been reported when processing the file, i.e. processedByProcessor is false.
             var tempOutFile = temporaryFile.Info;
-            return MakeTheReturnValue(
-                fileProcessingFailedHandler.FileProcessingFailed(
+            var failure = fileProcessingFailedHandler.FileProcessingFailed(
                     inFile,
                     outFile,
                     tempOutFile,
                     reportProgress,
                     ex.Message,
                     copyFailedFile,
-                    token));
+                    token);
+            details = fileProcessingFailedHandler.LastDetails;
+            return MakeTheReturnValue(failure);
         }
 
         CompressorMessage.FileFinished MakeTheReturnValue(string? errorMessage, TimeSpan? timeElapsed = null)
         {
             long inSize = inFile.Exists ? inFile.Length : 0;
             long outSize = outFile.Exists ? outFile.Length : 0;
-            return new CompressorMessage.FileFinished(inFile, inSize, outSize, timeElapsed, errorMessage);
+            if (details == null && (processor is IProcessingDetailsSource || processor is NoOpFileProcessor))
+            {
+                var format = inFile.Extension.TrimStart('.').ToUpperInvariant();
+                details = new ProcessingDetails(
+                    format,
+                    mode.ToString(),
+                    "Not applied",
+                    processor is NoOpFileProcessor ? "Listed only (dry run)" : errorMessage?.Contains("already exists", StringComparison.Ordinal) == true ? "Skipped existing output" : "Failed",
+                    "Not verified");
+            }
+
+            return new CompressorMessage.FileFinished(inFile, inSize, outSize, timeElapsed, errorMessage)
+            {
+                Details = details == null ? null : details with { OutputFile = outFile.FullName },
+            };
         }
     }
 }
