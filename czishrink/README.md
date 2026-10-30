@@ -50,6 +50,10 @@ files are skipped and reported in the error list and CSV. Copied files also appe
 progress, the CSV report, and the overall statistics. Symbolic links and junctions are
 skipped, and an output folder inside the input tree is excluded from copying.
 Dry Run lists the selected files without copying files or creating their folders.
+Input/output paths with symbolic links, junctions or linked ancestors are rejected.
+Processing uses privately reserved staging folders; existing files, including names
+ending in `~`, are never reused as temporary output. A blocked destination subfolder
+is reported in the error list and CSV while unrelated folders continue processing.
 
 **Copy files that fail processing** is a separate option: it tries to copy the
 original unchanged if compression, decompression or verification fails. Copies

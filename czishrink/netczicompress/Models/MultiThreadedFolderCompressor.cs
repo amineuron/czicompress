@@ -36,6 +36,12 @@ public class MultiThreadedFolderCompressor(
     /// <inheritdoc/>
     public IFolderCompressorRun PrepareNewRun(FolderCompressorParameters parameters, CancellationToken token)
     {
+        if (parameters.ProcessingOptions.CopyOtherFiles || parameters.ProcessingOptions.HasScientificFormats)
+        {
+            RejectLinkedDirectories(parameters.InputDir);
+            RejectLinkedDirectories(parameters.OutputDir);
+        }
+
         if ((parameters.ProcessingOptions.CopyOtherFiles || parameters.ProcessingOptions.HasScientificFormats) && SameDirectory(parameters.InputDir, parameters.OutputDir))
         {
             throw new ArgumentException("Input and output folders must be different when copying other files.", nameof(parameters));
@@ -57,9 +63,16 @@ public class MultiThreadedFolderCompressor(
             {
                 var files = processingOptions.CopyOtherFiles || processingOptions.HasScientificFormats
                     ? this.EnumerateAllFilesAsync(inputDir, inputDir, outputDir, recursive, mode != CompressionMode.NoOp, t)
-                    : this.EnumerateCzisAsync(inputDir, recursive, t);
-                await foreach (var file in files.WithCancellation(t).ConfigureAwait(false))
+                    : this.EnumerateCziEntriesAsync(inputDir, recursive, t);
+                await foreach (var entry in files.WithCancellation(t).ConfigureAwait(false))
                 {
+                    var file = entry.File;
+                    if (entry.Error != null)
+                    {
+                        yield return new CompressorMessage.FileFinished(file, 0, 0, null, entry.Error);
+                        continue;
+                    }
+
                     if (!processingOptions.CopyOtherFiles && !processingOptions.ProcessesExtension(file.Extension))
                     {
                         continue;
@@ -178,6 +191,11 @@ public class MultiThreadedFolderCompressor(
     private static void EnsureParentDirectoryExists(IFileInfo outFile)
     {
         var outputDir = outFile.Directory;
+        if (outputDir != null)
+        {
+            RejectLinkedDirectories(outputDir);
+        }
+
         if (outputDir?.Exists == false)
         {
             outputDir.Create();
@@ -190,6 +208,18 @@ public class MultiThreadedFolderCompressor(
             Path.TrimEndingDirectorySeparator(first.FullName),
             Path.TrimEndingDirectorySeparator(second.FullName),
             OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+    }
+
+    private static void RejectLinkedDirectories(IDirectoryInfo directory)
+    {
+        for (IDirectoryInfo? current = directory; current != null; current = current.Parent)
+        {
+            current.Refresh();
+            if (current.Exists && (current.Attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                throw new IOException($"Linked folders and linked ancestors are not supported: {current.FullName}");
+            }
+        }
     }
 
     private static async Task<int> WaitForTaskToComplete(IReadOnlyList<Task> tasks)
@@ -218,7 +248,18 @@ public class MultiThreadedFolderCompressor(
         return outFile;
     }
 
-    private async IAsyncEnumerable<IFileInfo> EnumerateAllFilesAsync(
+    private async IAsyncEnumerable<InputEntry> EnumerateCziEntriesAsync(
+        IDirectoryInfo folder,
+        bool recursive,
+        [EnumeratorCancellation] CancellationToken token)
+    {
+        await foreach (var file in this.EnumerateCzisAsync(folder, recursive, token).ConfigureAwait(false))
+        {
+            yield return new InputEntry(file);
+        }
+    }
+
+    private async IAsyncEnumerable<InputEntry> EnumerateAllFilesAsync(
         IDirectoryInfo folder,
         IDirectoryInfo inputDir,
         IDirectoryInfo outputDir,
@@ -236,7 +277,24 @@ public class MultiThreadedFolderCompressor(
         if (createDirectories)
         {
             var relativePath = inputDir.FileSystem.Path.GetRelativePath(inputDir.FullName, folder.FullName);
-            outputDir.FileSystem.Directory.CreateDirectory(outputDir.FileSystem.Path.Combine(outputDir.FullName, relativePath));
+            var destination = outputDir.FileSystem.DirectoryInfo.New(outputDir.FileSystem.Path.Combine(outputDir.FullName, relativePath));
+            string? error = null;
+            try
+            {
+                RejectLinkedDirectories(destination);
+                destination.Create();
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                error = $"Could not create output folder {destination.FullName}: {ex.Message}";
+            }
+
+            if (error != null)
+            {
+                // Report even empty blocked folders, then let each affected file
+                // report its own failure without preventing unrelated siblings.
+                yield return new InputEntry(inputDir.FileSystem.FileInfo.New(folder.FullName), error);
+            }
         }
 
         var opts = new EnumerationOptions
@@ -246,7 +304,7 @@ public class MultiThreadedFolderCompressor(
         };
         await foreach (var file in folder.EnumerateFilesAsync("*", opts, token).ConfigureAwait(false))
         {
-            yield return file;
+            yield return new InputEntry(file);
         }
 
         if (recursive)
@@ -287,17 +345,20 @@ public class MultiThreadedFolderCompressor(
                     errorMessage: $"Output file {outFile} already exists.");
             }
 
-            if (processor.NeedsExistingOutputDirectory)
+            if (!processor.NeedsExistingOutputDirectory)
             {
-                EnsureParentDirectoryExists(outFile);
+                // Dry Run must never allocate or clean up any temporary path.
+                var timestamp = Stopwatch.GetTimestamp();
+                processor.ProcessFile(inFile.FullName, outFile.FullName, reportProgress, token);
+                return MakeTheReturnValue(errorMessage: null, timeElapsed: Stopwatch.GetElapsedTime(timestamp));
             }
 
+            EnsureParentDirectoryExists(outFile);
             temporaryFile = new TemporaryFile(outFile, maxTriesToCreateTemporaryFiles);
             if (temporaryFile.TemporaryFileCreationFailed)
             {
-                var tempOutFile = temporaryFile.Info;
                 return MakeTheReturnValue(
-                    errorMessage: $"Could not delete existing temporary file {tempOutFile}.");
+                    errorMessage: $"Could not reserve temporary output for {outFile}.");
             }
 
             var temporaryOutFile = temporaryFile.Info;
@@ -332,6 +393,10 @@ public class MultiThreadedFolderCompressor(
             details = fileProcessingFailedHandler.LastDetails;
             return MakeTheReturnValue(failure);
         }
+        finally
+        {
+            temporaryFile?.Dispose();
+        }
 
         CompressorMessage.FileFinished MakeTheReturnValue(string? errorMessage, TimeSpan? timeElapsed = null)
         {
@@ -354,4 +419,6 @@ public class MultiThreadedFolderCompressor(
             };
         }
     }
+
+    private sealed record InputEntry(IFileInfo File, string? Error = null);
 }

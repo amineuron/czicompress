@@ -258,9 +258,9 @@ public class MultiThreadedFolderCompressorTests
         var processorFactory = CreateProcessorFactory(
             mode,
             processingOptions,
-            onMockCreated: m => { });
+            onMockCreated: m => m.SetupGet(p => p.NeedsExistingOutputDirectory).Returns(true));
 
-        var sut = CreateSut(processorFactory);
+        var sut = CreateSut(processorFactory, maxTriesToCreateTemporaryFiles: 0);
 
         var run = sut.PrepareNewRun(
             ff.GetFolderCompressorParameters(mode, executionOptions, processingOptions),
@@ -279,8 +279,8 @@ public class MultiThreadedFolderCompressorTests
         // ASSERT
         CompressorMessage.FileFinished GetExpectation(IFileInfo inputInfo)
         {
-            var filename = FoldersAndFiles.ToPlatformPath(@"C:\outputDir\image.czi~3");
-            var error = $@"Could not delete existing temporary file {filename}.";
+            var filename = FoldersAndFiles.ToPlatformPath(@"C:\outputDir\image.czi");
+            var error = $@"Could not reserve temporary output for {filename}.";
             long expectedOutputSize = 0;
 
             return new CompressorMessage.FileFinished(
@@ -470,12 +470,14 @@ public class MultiThreadedFolderCompressorTests
         var actualFileNamePairs =
             from p in processors
             from argsPair in p.GetProcessedFileArgs()
-            select argsPair;
+            select (argsPair.InputFile, Path.GetFileName(Path.GetDirectoryName(argsPair.OutputFile))!.StartsWith(".czishrink-", StringComparison.Ordinal)
+                ? Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(argsPair.OutputFile))!, Path.GetFileName(argsPair.OutputFile))
+                : argsPair.OutputFile);
 
         var expectedFileNamePairs =
             from f in ff.InitialFiles
             where f.EndsWith(".czi") && f.StartsWith(ff.InputDir.FullName)
-            select (f, GetExpectedOutputPath(f) + "~");
+            select (f, GetExpectedOutputPath(f));
 
         actualFileNamePairs.Should().BeEquivalentTo(
             expectedFileNamePairs,
