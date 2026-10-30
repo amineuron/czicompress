@@ -19,7 +19,7 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Grid ColumnDefinitions="Auto,20,60*" RowDefinitions="Auto, Auto, Auto, Auto, Auto, Auto, Auto">
+    <Grid ColumnDefinitions="Auto,20,60*" RowDefinitions="Auto, Auto, Auto, Auto, Auto, Auto">
         <Label
             Grid.Row="0"
             Grid.Column="0"
@@ -48,7 +48,7 @@
             Maximum="{Binding ThreadCount.Maximum, Mode=OneWay}"
             Minimum="{Binding ThreadCount.Minimum, Mode=OneWay}"
             ParsingNumberStyle="Integer"
-            ToolTip.Tip="Number of concurrent tasks. ND2, HDF5 and TIFF files are processed one at a time to limit memory use."
+            ToolTip.Tip="Number of concurrent tasks. HDF5 and TIFF files are processed one at a time to limit memory use."
             Value="{Binding ThreadCount, Converter={StaticResource ThreadCountToDecimalConverter}}" />
         <Label
             Grid.Row="3"
@@ -66,7 +66,7 @@
             Maximum="{Binding CompressionLevel.Maximum, Mode=OneWay}"
             Minimum="{Binding CompressionLevel.Minimum, Mode=OneWay}"
             ParsingNumberStyle="Integer"
-            ToolTip.Tip="CZI uses Zstandard levels 0–22. ND2, HDF5 and TIFF use lossless Deflate levels 1–9; values outside that range are clamped. Higher levels take more time."
+            ToolTip.Tip="CZI uses Zstandard levels 0–22. HDF5 and TIFF use lossless Deflate levels 1–9; values outside that range are clamped. Higher levels take more time."
             Value="{Binding CompressionLevel, Converter={StaticResource CompressionLevelToDecimalConverter}}" />
         <Label
             Grid.Row="1"
@@ -80,14 +80,11 @@
             VerticalAlignment="Center"
             IsChecked="{Binding CopyOtherFiles}"
             ToolTip.Tip="Copy files whose format is not selected for processing, preserving folders. Existing destination files are skipped. Dry Run only lists files." />
-        <Label Grid.Row="4" Grid.Column="0" VerticalAlignment="Center">Process Nikon ND2</Label>
-        <CheckBox Grid.Row="4" Grid.Column="2" IsChecked="{Binding ProcessNikonNd2}"
-                  ToolTip.Tip="Lossless modern ND2 Ver3.0 compression. Verifies every image and metadata chunk, then independently decodes all frames. Legacy and unsupported layouts are reported as errors." />
-        <Label Grid.Row="5" Grid.Column="0" VerticalAlignment="Center">Process HDF5 (.h5, .hdf5)</Label>
-        <CheckBox Grid.Row="5" Grid.Column="2" IsChecked="{Binding ProcessHdf5}"
+        <Label Grid.Row="4" Grid.Column="0" VerticalAlignment="Center">Process HDF5 (.h5, .hdf5)</Label>
+        <CheckBox Grid.Row="4" Grid.Column="2" IsChecked="{Binding ProcessHdf5}"
                   ToolTip.Tip="Repack with the official HDF5 tools using lossless gzip and shuffle. Verifies datasets and attributes with h5diff. External and virtual datasets are reported as unsupported." />
-        <Label Grid.Row="6" Grid.Column="0" VerticalAlignment="Center">Process TIFF / OME-TIFF</Label>
-        <CheckBox Grid.Row="6" Grid.Column="2" IsChecked="{Binding ProcessTiff}"
+        <Label Grid.Row="5" Grid.Column="0" VerticalAlignment="Center">Process TIFF / OME-TIFF</Label>
+        <CheckBox Grid.Row="5" Grid.Column="2" IsChecked="{Binding ProcessTiff}"
                   ToolTip.Tip="Lossless Deflate compression, with page, pixel and metadata verification. Unsupported proprietary metadata layouts are reported as errors." />
     </Grid>
 </UserControl>

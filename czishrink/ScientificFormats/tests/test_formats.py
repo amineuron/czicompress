@@ -1,7 +1,9 @@
-# SPDX-FileCopyrightText: 2026 czicompress contributors
+# SPDX-FileCopyrightText: 2026 Amin Khosrozadeh
 # SPDX-License-Identifier: GPL-3.0-or-later
 import contextlib
 import io
+import os
+import stat
 from pathlib import Path
 import sys
 import tempfile
@@ -15,6 +17,26 @@ import scientific_worker as worker
 
 
 class Formats(unittest.TestCase):
+    def test_read_only_sources_keep_data_and_permissions(self):
+        hdf5 = self.root / 'readonly.h5'
+        tiff = self.root / 'readonly.tiff'
+        values = np.arange(65536, dtype='uint16').reshape(256, 256)
+        with h5py.File(hdf5, 'w') as handle:
+            handle.create_dataset('pixels', data=values)
+        tifffile.imwrite(tiff, values, metadata=None)
+        for source in (hdf5, tiff):
+            before = worker.file_hash(source)
+            os.chmod(source, 0o444)
+            permissions = source.stat().st_mode
+            try:
+                output, _ = self.run_file(source)
+                self.assertEqual(worker.file_hash(source), before)
+                self.assertEqual(source.stat().st_mode, permissions)
+                if os.name != 'nt':
+                    self.assertEqual(output.stat().st_mode & stat.S_IWOTH, permissions & stat.S_IWOTH)
+            finally:
+                os.chmod(source, 0o666)
+
     def setUp(self):
         self.folder = tempfile.TemporaryDirectory()
         self.root = Path(self.folder.name)

@@ -1,6 +1,9 @@
-# SPDX-FileCopyrightText: 2026 czicompress contributors
+# SPDX-FileCopyrightText: 2026 Amin Khosrozadeh
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Portable, process-isolated lossless processing for ND2, HDF5 and TIFF.
+#
+# Contributor: Amin Khosrozadeh, PhD.
+# Affiliation: Prof. Vassiliki Nikoletopoulou lab, DNF, UNIL.
+"""Portable, process-isolated lossless processing for HDF5 and TIFF.
 
 The GUI owns cancellation and removes its temporary output on failure. This
 worker writes only a new destination and verifies data before reporting success.
@@ -12,6 +15,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -275,10 +279,7 @@ def process(source, destination, mode, level, kind=None):
     progress(0)
     original_hash = file_hash(source)
     try:
-        if kind == '.nd2':
-            from nd2_repack import repack
-            result = repack(source, destination, mode, level, progress)
-        elif kind in ('.h5', '.hdf5'):
+        if kind in ('.h5', '.hdf5'):
             result = hdf5_repack(source, destination, mode, level)
         elif kind in ('.tif', '.tiff'):
             result = tiff_repack(source, destination, mode, level)
@@ -302,7 +303,7 @@ def process(source, destination, mode, level, kind=None):
         result['container_byte_identical'] = original_hash == output_hash
         shutil.copystat(source, destination)
         # Keep output writable even when source is read-only, so temp-file cleanup works.
-        os.chmod(destination, 0o666)
+        os.chmod(destination, stat.S_IMODE(destination.stat().st_mode) | stat.S_IWUSR)
         progress(100)
         return result
     except BaseException:

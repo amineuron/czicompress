@@ -1,100 +1,81 @@
-# Scientific format processing
+# Combined CZI, HDF5, TIFF and accompanying-file copying
 
-The CziShrink GUI can opt into processing modern Nikon ND2, HDF5 and TIFF files.
-The original CZI engine is unchanged. All additional formats default to off.
-The portable Windows build includes its own Python runtime and native HDF5 tools;
-users do not need Python, administrator rights, or separate codec installations.
+Contributor: **Amin Khosrozadeh, PhD** — Prof. Vassiliki Nikoletopoulou lab,
+DNF, University of Lausanne (UNIL).
+[Lab](https://dnf-unil.ch/group/autophagic-mechanisms-of-protein-homeostasis-in-neurons/member/nikoletopoulou-vassiliki-nikoletopoulou)
 
-## Formats and validation
+Enable **Process HDF5** and/or **Process TIFF / OME-TIFF** in advanced options.
+Both default to off. CZI retains its native engine. Compressed results keep their
+original extensions and can be read by software supporting the chosen codec.
+**Decompress all data** removes supported compression in the same native formats.
+Levels are clamped to 1–9 for these formats; CZI retains its original range.
 
-- **ND2:** supports modern Ver3.0 files with standard `ImageDataSeq` frames and
-  uncompressed or lossless image data. Writes zlib-compressed image chunks,
-  preserves each active non-image chunk byte-for-byte, and changes only the
-  compression scalar in `ImageAttributesLV!`. Before success, checks every
-  metadata chunk, frame timestamp and decoded frame buffer, then uses the
-  independent `nd2` reader to compare every frame, dtype, shape and calibration.
-  Legacy JPEG2000 files, lossy files and unsupported tiled layouts fail explicitly.
-  Validation with Nikon NIS-Elements remains a manual compatibility check.
-- **HDF5:** uses the official HDF5 1.14.6 `h5repack` and `h5diff` programs. Numeric
-  datasets receive shuffle and gzip. Scalars, empty datasets and object datatypes
-  are copied by HDF5. Attributes and references are checked by `h5diff`; fixed-width
-  dataset values are additionally compared bit-for-bit in bounded memory blocks,
-  including floating-point NaN payloads and signed zeros. User blocks, external
-  links, external storage and virtual datasets are
-  rejected rather than relocated incorrectly. Long filter lists use an options
-  file. Very long lists with whitespace in dataset names are unsupported.
-- **TIFF:** uses `tifffile` and `imagecodecs` for lossless Deflate. Supports ordinary
-  TIFF, BigTIFF, multi-page files, OME metadata and SubIFD pyramids. Verifies every
-  page's pixel bytes and metadata tags; storage offsets, layout and compression
-  tags are regenerated. Unsupported EXIF/GPS pointer structures, implicit ImageJ
-  hyperstacks, and selected proprietary variants fail explicitly. Any additional
-  metadata that cannot be retained fails verification instead of being dropped.
+HDF5 uses official HDF5 1.14.6 tools with gzip and shuffle. `h5diff` checks decoded
+data, attributes and references; fixed-width dataset values are additionally
+compared bit-for-bit in bounded blocks, including floating-point NaN payloads and
+signed zeros. External links/storage, virtual datasets and user-block metadata
+are rejected. Long filter lists use an options file; very long lists containing
+whitespace in dataset names are unsupported. Default compression modes leave
+already-filtered datasets alone; **Compress all data** recompresses supported data.
 
-Compression levels are clamped to 1–9 for these formats; CZI keeps its Zstandard
-0–22 range. The existing uncompressed modes skip already-compressed ND2 files,
-TIFFs containing compressed pages, and HDF5 datasets that already have filters.
-**Compress all data** recompresses supported files, and **Decompress all data**
-removes supported compression. A compression result that would be larger is
-replaced with a byte-for-byte copy of the original instead.
+TIFF uses `tifffile`/`imagecodecs` for lossless Deflate and suitable predictors.
+Tests cover ordinary TIFF, BigTIFF, OME, multiple pages, SubIFD pyramids, private
+tags, palette/RGB data and floating-point bits. Every page's pixels and metadata
+are checked. Storage tags and offsets are regenerated. Unsupported proprietary
+layouts, EXIF/GPS pointers and implicit ImageJ hyperstacks fail explicitly.
 
-The GUI processes additional formats one at a time to bound memory consumption.
-Stopping kills the worker and its child tools, waits for exit, and removes the
-temporary output. Failures appear in the normal CSV and error list. The existing
-copy-failed option can preserve the original file on processing failure.
+Inputs are opened read-only. Private destination staging space prevents overwrites
+and preserves existing files. Dry Run bypasses staging. Cancellation kills and
+waits for the worker and its child tools. A larger compression result is replaced
+with a verified original-file copy. Per-file reports append method, verification,
+SHA-256 hashes and destination while retaining the original eight CSV columns.
+Decoded data equivalence does not promise byte-identical container restoration.
+CZI reports explicitly state that its pixels are not independently verified.
 
-All successful operations record source/output SHA-256 hashes. Native repacking
-verifies decoded content rather than promising original container byte identity.
-The original CZI engine's results are identified separately because its decoded
-pixels are not independently checked per file. Original-file copies are verified
-byte-for-byte. The CSV includes actual codec, action, verification, hashes and
-destination for each file. Development uses local fixture copies; NAS input is
-strictly read-only and is never a development output or cleanup target.
+HDF5-based BigDataViewer and OME-TIFF occur in microscopy workflows supported by
+[ZEISS arivis Pro](https://www.zeiss.com/microscopy/en/products/software/arivis-pro.html?hsLang=en).
+[BigDataViewer documents XML/HDF5 and a ZEISS Lightsheet Z.1 example](https://imagej.net/plugins/bdv/).
+For paired datasets, keep companion XML files and relative paths together; enable **Copy other files and folders** to copy accompanying files in this combined build. Generic HDF5/TIFF
+checks do not establish compatibility with every vendor-specific reader.
+ZEISS viewer validation remains a manual follow-up.
 
-## Build and reproduce
+## Windows build and tests
 
-1. Use the .NET SDK pinned by `../global.json` (currently 8.0.403).
-2. Run `./prepare-windows-tools.ps1` from PowerShell. It downloads a project-local
-   Python 3.13.17 embedded runtime, pinned Python wheels, and the official HDF5
-   Windows tools into `../../artifacts/format-tools`. It does not install system
-   software. Network access is required.
-3. From `czishrink`, publish:
+Use the SDK in `../global.json` (8.0.403). Run `./prepare-windows-tools.ps1` from
+PowerShell. It prepares an isolated Python 3.13.17 runtime, four pinned packages,
+and official HDF5 tools under `../../artifacts/hdf5-tiff-tools` without a system
+installation or administrator access. Dependencies retain their bundled licenses.
+Source locations: [Python](https://www.python.org/downloads/release/python-31317/),
+[HDF5](https://github.com/HDFGroup/hdf5/releases/tag/hdf5_1.14.6), and each pinned
+package's source distribution and upstream project links on PyPI.
 
-   ```powershell
-   dotnet publish netczicompress.Desktop/netczicompress.Desktop.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=true -p:VersionSuffix=multiformat -o ../artifacts/publish/CziShrink-multiformat-win-x64
-   ```
-
-The desktop project copies the worker sources and all files under the tools
-directory into `FormatTools` beside the executable. Override
-`-p:ScientificToolsDirectory=...` to supply another prepared directory.
-`CZISHRINK_FORMAT_TOOLS` can point to that directory for development and testing.
-
-Run the codec tests with the prepared runtime, setting `CZISHRINK_FORMAT_TOOLS`
-to the absolute tools directory:
+From `czishrink`, publish:
 
 ```powershell
-../../artifacts/format-tools/python/python.exe -B tests/test_formats.py -v
+dotnet publish netczicompress.Desktop/netczicompress.Desktop.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ../artifacts/publish
 ```
 
-The C# tests cover GUI parameter propagation, file routing, dry-run behavior,
-recursion, copying, cancellation, collision handling and the CZI engine. The codec
-tests cover TIFF metadata, OME, pyramids, RGB, BigTIFF, float bit patterns, HDF5
-attributes and references, filter preservation and unsupported external links.
+The desktop project bundles the prepared tools and worker into `FormatTools`.
+Keep the complete published folder together. Override `ScientificToolsDirectory`
+at build time or `CZISHRINK_FORMAT_TOOLS` at runtime when using a different tools
+directory. Missing runtimes produce explicit errors; CZI works without Python.
 
-The independent reader and codec dependencies retain their original licenses in
-the bundled Python `*.dist-info` directories; Python and HDF5 license notices
-are also included. The worker source is GPL-3.0-or-later. When distributing a
-modified app, provide the matching source and build instructions, and retain
-the original and dependency license notices.
+```powershell
+$env:CZISHRINK_FORMAT_TOOLS = (Resolve-Path ../artifacts/hdf5-tiff-tools).Path
+& "$env:CZISHRINK_FORMAT_TOOLS/python/python.exe" -B ScientificFormats/tests/test_formats.py -v
+```
 
-Dependency sources and versions:
+Linux developers can prepare a compatible Python environment at
+`$CZISHRINK_FORMAT_TOOLS/python/bin/python3`, install the pinned requirements,
+and install `h5repack`/`h5diff` on PATH. Automatic portable-runtime packaging is
+currently configured for Windows; Linux codec/runtime validation is pending.
+All development tests use synthetic files or existing local copies. NAS is
+read-only and is never an output or cleanup target.
 
-- Python 3.13.17: https://www.python.org/downloads/release/python-31317/
-- HDF5 1.14.6: https://github.com/HDFGroup/hdf5/releases/tag/hdf5_1.14.6
-- All Python package versions are pinned in `requirements-lock.txt`. Their source
-  distributions and project links are available at
-  `https://pypi.org/project/<package>/<version>/`; the bundled `*.dist-info/METADATA`
-  files retain upstream project information and license notices.
-- The unchanged native CZI package is `libczicompressc` 0.5.2. Its NuGet metadata
-  identifies the source commit as
-  https://github.com/ZEISS/czicompress/tree/40a2ba8489544626c2481ca95177b3235b5c0de7.
-  The repository includes its native build configuration and original notices.
+The local integration harness creates synthetic fixtures with
+`tests/create_integration_fixtures.py <new-input-directory>`. Restore
+`IntegrationChecks/IntegrationChecks.csproj` with `dotnet restore --locked-mode`,
+then run it with `dotnet run --project IntegrationChecks/IntegrationChecks.csproj
+-c Release --no-restore -- <input-directory> <new-output-directory>`, keeping
+`CZISHRINK_FORMAT_TOOLS` set. It checks native CZI/HDF5/TIFF processing, both
+report directions, verification evidence, cancellation and missing runtimes.

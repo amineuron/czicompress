@@ -139,10 +139,6 @@ public class MainViewModel : ViewModelBase,
 
     /// <inheritdoc/>
     [Reactive]
-    public bool ProcessNikonNd2 { get; set; }
-
-    /// <inheritdoc/>
-    [Reactive]
     public bool ProcessHdf5 { get; set; }
 
     /// <inheritdoc/>
@@ -253,7 +249,6 @@ public class MainViewModel : ViewModelBase,
     {
         ProcessingOptions processingOptions = new(this.CompressionLevel, this.CopyFailedFiles, this.CopyOtherFiles)
         {
-            ProcessNikonNd2 = this.ProcessNikonNd2,
             ProcessHdf5 = this.ProcessHdf5,
             ProcessTiff = this.ProcessTiff,
         };

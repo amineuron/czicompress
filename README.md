@@ -3,11 +3,11 @@
 [![MegaLinter](https://github.com/ZEISS/czicompress/actions/workflows/mega-linter.yml/badge.svg?branch=main&event=push)](https://github.com/ZEISS/czicompress/actions/workflows/mega-linter.yml)
 [![codecov](https://codecov.io/gh/ZEISS/czicompress/graph/badge.svg?token=qxNgNpz4VZ)](https://codecov.io/gh/ZEISS/czicompress)
 
-This personal fork adds optional Nikon ND2, HDF5 and TIFF processing to CziShrink,
+This personal fork adds optional HDF5 and TIFF processing to CziShrink,
 including decompression and verification reports. See the
 [scientific format support and build instructions](czishrink/ScientificFormats/README.md).
 These experimental additions are maintained separately from the copy-files feature
-proposed upstream. This fork is not an official ZEISS or Nikon release.
+proposed upstream. This fork is not an official ZEISS release.
 
 Reduce the size of existing CZI files by converting them to zstd-compressed CZI files.
 

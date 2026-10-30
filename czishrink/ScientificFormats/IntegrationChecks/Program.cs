@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 czicompress contributors
+// SPDX-FileCopyrightText: 2026 Amin Khosrozadeh
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 namespace netczicompress.IntegrationChecks;
@@ -25,7 +25,6 @@ public static class Program
         var fs = new FileSystem();
         var options = new ProcessingOptions(CompressionLevel.Default, CopyFailedFiles: false, CopyOtherFiles: true)
         {
-            ProcessNikonNd2 = true,
             ProcessHdf5 = true,
             ProcessTiff = true,
         };
@@ -52,7 +51,7 @@ public static class Program
             OutputBytes = item.SizeOutput,
             Error = item.ErrorMessage,
         })));
-        if (results.Count != 5 || results.Any(item => item.ErrorMessage != null))
+        if (results.Count != 4 || results.Any(item => item.ErrorMessage != null))
         {
             throw new IOException("Mixed-format integration failed.");
         }
@@ -60,6 +59,11 @@ public static class Program
         if (results.Any(item => item.Details?.InputSha256?.Length != 64 || item.Details.OutputSha256?.Length != 64))
         {
             throw new IOException("Per-file integrity evidence is missing.");
+        }
+
+        if (!Directory.Exists(Path.Combine(args[1], "empty-folder")))
+        {
+            throw new IOException("Empty accompanying folder was not copied.");
         }
 
         var decompressParameters = parameters with
@@ -74,7 +78,7 @@ public static class Program
         var decompression = decompressRun.Output.ToTask();
         decompressRun.Start();
         await decompression;
-        if (decompressed.Count != 5 || decompressed.Any(item => item.ErrorMessage != null))
+        if (decompressed.Count != 4 || decompressed.Any(item => item.ErrorMessage != null))
         {
             throw new IOException("Mixed-format decompression failed.");
         }

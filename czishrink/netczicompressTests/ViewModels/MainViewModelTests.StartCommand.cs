@@ -195,7 +195,7 @@ public partial class MainViewModelTests
     [Theory]
     [AutoData]
     public async Task StartCommands_WhenProcessingStarts_UsesCorrectParameters(
-        OperationMode selectedMode, bool recursive, bool copyOtherFiles, bool nikon, bool hdf5, bool tiff)
+        OperationMode selectedMode, bool recursive, bool copyOtherFiles, bool hdf5, bool tiff)
     {
         // ARRANGE
         IFixture fixture = CreateFixture();
@@ -208,7 +208,6 @@ public partial class MainViewModelTests
         sut.SelectedMode = selectedMode;
         sut.Recursive = recursive;
         sut.CopyOtherFiles = copyOtherFiles;
-        sut.ProcessNikonNd2 = nikon;
         sut.ProcessHdf5 = hdf5;
         sut.ProcessTiff = tiff;
 
@@ -226,7 +225,6 @@ public partial class MainViewModelTests
                         x.Recursive == recursive &&
                         x.Mode == selectedMode.Value &&
                         x.ProcessingOptions.CopyOtherFiles == copyOtherFiles &&
-                        x.ProcessingOptions.ProcessNikonNd2 == nikon &&
                         x.ProcessingOptions.ProcessHdf5 == hdf5 &&
                         x.ProcessingOptions.ProcessTiff == tiff),
                 It.Is<CancellationToken>(t => !t.IsCancellationRequested)),
@@ -260,7 +258,6 @@ public partial class MainViewModelTests
         // ASSERT
         var expectedProcessingOptions = new ProcessingOptions(sut.CompressionLevel, sut.CopyFailedFiles, sut.CopyOtherFiles)
         {
-            ProcessNikonNd2 = sut.ProcessNikonNd2,
             ProcessHdf5 = sut.ProcessHdf5,
             ProcessTiff = sut.ProcessTiff,
         };

@@ -22,6 +22,15 @@
         "resolved": "0.0.29",
         "contentHash": "U4eJLQdoDNHXtEba7MZUCwrBErBTxFp6sUewXBOdAhU0Kwzwaa/EKFcYm8kpcysjzKtfB4S0S9n0uxKZFz/ikw=="
       },
+      "Avalonia.Controls.ColorPicker": {
+        "type": "Transitive",
+        "resolved": "11.2.3",
+        "contentHash": "JpK84GN+CkS5H0L/mDyYa4aMAJw93dukedKK1xC4g/J5NmwQ23qFPQNqZlTs+6f9nULwJPL+jiffJpSyGMt0gg==",
+        "dependencies": {
+          "Avalonia": "11.2.3",
+          "Avalonia.Remote.Protocol": "11.2.3"
+        }
+      },
       "Avalonia.Remote.Protocol": {
         "type": "Transitive",
         "resolved": "11.2.3",
@@ -34,6 +43,14 @@
         "dependencies": {
           "Avalonia": "11.0.0",
           "Svg.Model": "1.0.0"
+        }
+      },
+      "Avalonia.Themes.Simple": {
+        "type": "Transitive",
+        "resolved": "11.2.3",
+        "contentHash": "Okio7RYUHUk1m/1n6VGrkoq0C3Y3J6RwtrTGEfXPkYMJsL6yPqstJZMYkMFQPISUr8TYUNVKv82hL1qLRw7hwA==",
+        "dependencies": {
+          "Avalonia": "11.2.3"
         }
       },
       "ColorTextBlock.Avalonia": {
@@ -355,6 +372,7 @@
         "dependencies": {
           "Avalonia": "[11.2.3, )",
           "Avalonia.Controls.DataGrid": "[11.2.3, )",
+          "Avalonia.Diagnostics": "[11.2.3, )",
           "Avalonia.Fonts.Inter": "[11.2.3, )",
           "Avalonia.ReactiveUI": "[11.2.3, )",
           "Avalonia.Themes.Fluent": "[11.2.3, )",
@@ -385,6 +403,18 @@
         "dependencies": {
           "Avalonia": "11.2.3",
           "Avalonia.Remote.Protocol": "11.2.3"
+        }
+      },
+      "Avalonia.Diagnostics": {
+        "type": "CentralTransitive",
+        "requested": "[11.2.3, )",
+        "resolved": "11.2.3",
+        "contentHash": "Qld0UvkSLfIuZD7/gS8RIO6ww3jP+xJvsMyqU8evdphPoic7h6LAeY/ppT9NtI0r1KUDT2BpFcVDqPyQH6eSiw==",
+        "dependencies": {
+          "Avalonia": "11.2.3",
+          "Avalonia.Controls.ColorPicker": "11.2.3",
+          "Avalonia.Controls.DataGrid": "11.2.3",
+          "Avalonia.Themes.Simple": "11.2.3"
         }
       },
       "Avalonia.Fonts.Inter": {

@@ -1,6 +1,6 @@
-# SPDX-FileCopyrightText: 2026 czicompress contributors
+# SPDX-FileCopyrightText: 2026 Amin Khosrozadeh
 # SPDX-License-Identifier: GPL-3.0-or-later
-param([string]$ToolsDirectory = (Join-Path $PSScriptRoot '../../artifacts/format-tools'))
+param([string]$ToolsDirectory = (Join-Path $PSScriptRoot '../../artifacts/hdf5-tiff-tools'))
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $ToolsDirectory = [IO.Path]::GetFullPath($ToolsDirectory)

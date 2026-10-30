@@ -62,7 +62,7 @@ public class MultiThreadedFolderCompressor(
             try
             {
                 var files = processingOptions.CopyOtherFiles || processingOptions.HasScientificFormats
-                    ? this.EnumerateAllFilesAsync(inputDir, inputDir, outputDir, recursive, mode != CompressionMode.NoOp, t)
+                    ? this.EnumerateAllFilesAsync(inputDir, inputDir, outputDir, recursive, processingOptions.CopyOtherFiles && mode != CompressionMode.NoOp, t)
                     : this.EnumerateCziEntriesAsync(inputDir, recursive, t);
                 await foreach (var entry in files.WithCancellation(t).ConfigureAwait(false))
                 {
@@ -388,6 +388,7 @@ public class MultiThreadedFolderCompressor(
 
         CompressorMessage.FileFinished MakeTheReturnValue(string? errorMessage, TimeSpan? timeElapsed = null)
         {
+            outFile.Refresh();
             long inSize = inFile.Exists ? inFile.Length : 0;
             long outSize = outFile.Exists ? outFile.Length : 0;
             if (details == null && (processor is IProcessingDetailsSource || processor is NoOpFileProcessor))

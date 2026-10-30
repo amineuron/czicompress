@@ -59,15 +59,14 @@ is reported in the error list and CSV while unrelated folders continue processin
 original unchanged if compression, decompression or verification fails. Copies
 are checked with SHA-256, and inputs are opened with read-only access.
 
-### Nikon ND2, HDF5 and TIFF
+### HDF5 and TIFF
 
-In this custom build, the advanced options also offer **Process Nikon ND2**,
-**Process HDF5 (.h5, .hdf5)** and **Process TIFF / OME-TIFF**. They default to off.
+In this combined build, the advanced options offer **Process HDF5 (.h5, .hdf5)** and **Process TIFF / OME-TIFF**. They default to off.
 CZI remains enabled. New format codecs run locally from the bundled `FormatTools`
 folder, which must stay beside the executable. No separate Python installation
 or administrator access is required for the portable Windows build.
 
-ND2 uses lossless zlib image compression; HDF5 uses the official HDF5 tools with
+HDF5 uses the official HDF5 tools with
 gzip and shuffle; TIFF uses lossless Deflate with suitable pixel predictors.
 These codecs use levels 1–9 (values outside that range are clamped), while CZI
 keeps its original Zstandard range. See [format support and limitations](ScientificFormats/README.md).
@@ -79,7 +78,7 @@ necessarily byte-identical to the original. Use a byte-preserving archive when
 exact restoration of the original file bytes is required. Inputs are never edited;
 outputs and CSV reports are written only to the selected destination.
 
-Contributed by Amin Khosrozadeh, PhD ? Prof. Vassiliki Nikoletopoulou lab, DNF, UNIL.
+Contributed by Amin Khosrozadeh, PhD — Prof. Vassiliki Nikoletopoulou lab, DNF, UNIL.
 
 ## Parameters
 
@@ -153,7 +152,7 @@ The CZI engine is not independently decoded per file by this report.
 - Is the compression lossy?
   - The tool uses [Zstandard](https://github.com/facebook/zstd) which is a fast and lossless compression algorithm.
 - What happens to files that the tool is not able to compress? Are they still copied to the output folder?
-  - If **Copy files that fail processing** is enabled, the app tries to copy the original unchanged. The processing error is still logged, together with whether copying succeeded. Otherwise the failed file is not copied. Use the format checkboxes to process ND2/HDF5/TIFF, and **Copy other files and folders** to include remaining accompanying files.
+  - If **Copy files that fail processing** is enabled, the app tries to copy the original unchanged. The processing error is still logged, together with whether copying succeeded. Otherwise the failed file is not copied. Use the format checkboxes to process HDF5/TIFF, and **Copy other files and folders** to include remaining accompanying files.
 
 
 ## Known Issues
