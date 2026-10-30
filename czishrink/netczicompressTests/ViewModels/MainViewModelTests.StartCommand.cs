@@ -20,6 +20,34 @@ using netczicompressTests.Models.Mocks;
 /// <content>Tests for <see cref="MainViewModel.StartCommand"/>.</content>
 public partial class MainViewModelTests
 {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task StartCommand_RejectsLinkedPathsBeforeCreatingTheOutputFolder(bool inputIsLinked)
+    {
+        IFixture fixture = CreateFixture();
+        IFileSystem fs = NewMockFileSystem();
+        fixture.Inject(fs);
+        var compressor = fixture.Freeze<Mock<IFolderCompressor>>();
+        var sut = fixture.Create<MainViewModel>();
+        SetFolders(sut, fs);
+        var linked = fs.Directory.CreateDirectory(fs.Path.Combine(fs.Path.GetDirectoryName(sut.InputDirectory)!, Guid.NewGuid().ToString("N")));
+        linked.Attributes |= FileAttributes.ReparsePoint;
+        sut.CopyOtherFiles = true;
+        if (inputIsLinked)
+        {
+            sut.InputDirectory = linked.FullName;
+        }
+
+        sut.OutputDirectory = fs.Path.Combine(inputIsLinked ? linked.Parent!.FullName : linked.FullName, "must-not-create");
+
+        await sut.StartCommand.Execute(default).ToTask();
+
+        sut.OverallStatus.Should().Contain("Linked folders");
+        fs.Directory.Exists(sut.OutputDirectory).Should().BeFalse();
+        compressor.Verify(p => p.PrepareNewRun(It.IsAny<FolderCompressorParameters>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [Fact]
     public void StartCommand_WhenInputFolderNotSet_CannotExecute()
     {
