@@ -38,8 +38,8 @@ public class MultiThreadedFolderCompressor(
     {
         if (parameters.ProcessingOptions.CopyOtherFiles || parameters.ProcessingOptions.HasScientificFormats)
         {
-            RejectLinkedDirectories(parameters.InputDir);
-            RejectLinkedDirectories(parameters.OutputDir);
+            ProcessingPathValidation.RejectLinkedDirectories(parameters.InputDir);
+            ProcessingPathValidation.RejectLinkedDirectories(parameters.OutputDir);
         }
 
         if ((parameters.ProcessingOptions.CopyOtherFiles || parameters.ProcessingOptions.HasScientificFormats) && SameDirectory(parameters.InputDir, parameters.OutputDir))
@@ -193,7 +193,7 @@ public class MultiThreadedFolderCompressor(
         var outputDir = outFile.Directory;
         if (outputDir != null)
         {
-            RejectLinkedDirectories(outputDir);
+            ProcessingPathValidation.RejectLinkedDirectories(outputDir);
         }
 
         if (outputDir?.Exists == false)
@@ -208,18 +208,6 @@ public class MultiThreadedFolderCompressor(
             Path.TrimEndingDirectorySeparator(first.FullName),
             Path.TrimEndingDirectorySeparator(second.FullName),
             OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
-    }
-
-    private static void RejectLinkedDirectories(IDirectoryInfo directory)
-    {
-        for (IDirectoryInfo? current = directory; current != null; current = current.Parent)
-        {
-            current.Refresh();
-            if (current.Exists && (current.Attributes & FileAttributes.ReparsePoint) != 0)
-            {
-                throw new IOException($"Linked folders and linked ancestors are not supported: {current.FullName}");
-            }
-        }
     }
 
     private static async Task<int> WaitForTaskToComplete(IReadOnlyList<Task> tasks)
@@ -281,7 +269,7 @@ public class MultiThreadedFolderCompressor(
             string? error = null;
             try
             {
-                RejectLinkedDirectories(destination);
+                ProcessingPathValidation.RejectLinkedDirectories(destination);
                 destination.Create();
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

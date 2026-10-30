@@ -232,6 +232,8 @@ public class MainViewModel : ViewModelBase,
 
         var result = this.fileSystem.DirectoryInfo.New(directory);
 
+        ProcessingPathValidation.RejectLinkedDirectories(result);
+
         if (!result.Exists)
         {
             if (createIfNecessary)
