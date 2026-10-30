@@ -13,6 +13,219 @@ using System.Reactive.Threading.Tasks;
 /// </summary>
 public class CopyOtherFilesTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CopyOtherFiles_PreservesTildeNamedFiles(bool destinationAlreadyExists)
+    {
+        var fs = new MockFileSystem();
+        string input = NewPath("input");
+        string output = NewPath("output");
+        fs.AddFile(Path.Combine(input, "notes.txt~"), new MockFileData("accompanying tilde file"));
+        fs.AddFile(Path.Combine(input, "notes.txt"), new MockFileData("notes"));
+        if (destinationAlreadyExists)
+        {
+            fs.AddFile(Path.Combine(output, "notes.txt~"), new MockFileData("valuable destination"));
+        }
+
+        var messages = await Run(fs, input, output);
+
+        fs.File.ReadAllText(Path.Combine(output, "notes.txt~")).Should().Be(
+            destinationAlreadyExists ? "valuable destination" : "accompanying tilde file");
+        fs.File.ReadAllText(Path.Combine(output, "notes.txt")).Should().Be("notes");
+        fs.File.ReadAllText(Path.Combine(input, "notes.txt~")).Should().Be("accompanying tilde file");
+        messages.Count(m => m.ErrorMessage != null).Should().Be(destinationAlreadyExists ? 1 : 0);
+        fs.Directory.GetFiles(output).Should().HaveCount(2);
+        fs.Directory.GetDirectories(output).Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DryRunPreservesAllExistingDestinationFiles(bool copyOtherFiles)
+    {
+        var fs = new MockFileSystem();
+        string input = NewPath("input");
+        string output = NewPath("output");
+        fs.AddFile(Path.Combine(input, "image.czi"), new MockFileData("original"));
+        fs.AddFile(Path.Combine(input, "notes.txt"), new MockFileData("notes"));
+        fs.AddFile(Path.Combine(output, "image.czi~"), new MockFileData("valuable image tilde"));
+        fs.AddFile(Path.Combine(output, "notes.txt~"), new MockFileData("valuable note tilde"));
+        fs.AddFile(Path.Combine(output, "notes.txt~1"), new MockFileData("valuable numbered file"));
+        var before = fs.AllFiles.ToDictionary(path => path, fs.File.ReadAllText);
+
+        await Run(fs, input, output, copyOtherFiles: copyOtherFiles, mode: CompressionMode.NoOp);
+
+        fs.AllFiles.ToDictionary(path => path, fs.File.ReadAllText).Should().BeEquivalentTo(before);
+        fs.Directory.GetDirectories(output).Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DestinationFolderCollisionIsReportedAndSiblingFilesContinue(bool emptyFolder)
+    {
+        var fs = new MockFileSystem();
+        string input = NewPath("input");
+        string output = NewPath("output");
+        fs.Directory.CreateDirectory(Path.Combine(input, "TIFF"));
+        if (!emptyFolder)
+        {
+            fs.AddFile(Path.Combine(input, "TIFF", "image.tif"), new MockFileData("pixels"));
+        }
+
+        fs.AddFile(Path.Combine(input, "unrelated", "notes.txt"), new MockFileData("sibling notes"));
+        fs.AddFile(Path.Combine(output, "TIFF"), new MockFileData("valuable file blocking the folder"));
+
+        var messages = await Run(fs, input, output);
+
+        fs.File.ReadAllText(Path.Combine(output, "TIFF")).Should().Be("valuable file blocking the folder");
+        fs.File.ReadAllText(Path.Combine(output, "unrelated", "notes.txt")).Should().Be("sibling notes");
+        messages.Should().Contain(m => m.ErrorMessage != null && m.ErrorMessage.Contains("Could not create output folder"));
+        if (!emptyFolder)
+        {
+            messages.Should().Contain(m => m.InputFile.Name == "image.tif" && m.ErrorMessage != null);
+        }
+
+        using var text = new StringWriter();
+        var csv = new CsvLogFileWriter(text);
+        foreach (var message in messages)
+        {
+            csv.OnNext(message);
+        }
+
+        text.ToString().Should().Contain("Could not create output folder").And.Contain("notes.txt");
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    [InlineData(false, true)]
+    public void LinkedRootOrAncestorIsRejectedBeforeTraversal(bool inputIsLinked, bool ancestorIsLinked)
+    {
+        var fs = new MockFileSystem();
+        string root = NewPath("root");
+        var input = fs.Directory.CreateDirectory(Path.Combine(root, "source", "input"));
+        var output = fs.Directory.CreateDirectory(Path.Combine(root, "destination", "output"));
+        var linked = inputIsLinked ? input : output;
+        if (ancestorIsLinked)
+        {
+            linked = linked.Parent!;
+        }
+
+        linked.Attributes |= FileAttributes.ReparsePoint;
+        var compressor = new MultiThreadedFolderCompressor((_, _) => new NoOpFileProcessor(), new FileProcessingFailedHandler());
+        var parameters = new FolderCompressorParameters(input, output, true, CompressionMode.NoOp, new ExecutionOptions(ThreadCount.Default), new ProcessingOptions(CompressionLevel.Default, CopyOtherFiles: true));
+
+        Action prepare = () => compressor.PrepareNewRun(parameters, CancellationToken.None);
+
+        prepare.Should().Throw<IOException>().WithMessage("*Linked folders*");
+        fs.AllFiles.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task LinkedDestinationSubfolderIsReportedWithoutWritingThroughIt()
+    {
+        var fs = new MockFileSystem();
+        string input = NewPath("input");
+        string output = NewPath("output");
+        fs.AddFile(Path.Combine(input, "TIFF", "image.tif"), new MockFileData("pixels"));
+        fs.AddFile(Path.Combine(input, "unrelated", "notes.txt"), new MockFileData("notes"));
+        var linked = fs.Directory.CreateDirectory(Path.Combine(output, "TIFF"));
+        linked.Attributes |= FileAttributes.ReparsePoint;
+
+        var messages = await Run(fs, input, output);
+
+        fs.File.Exists(Path.Combine(output, "TIFF", "image.tif")).Should().BeFalse();
+        fs.File.ReadAllText(Path.Combine(output, "unrelated", "notes.txt")).Should().Be("notes");
+        messages.Should().Contain(m => m.InputFile.Name == "image.tif" && m.ErrorMessage != null && m.ErrorMessage.Contains("Linked folders"));
+    }
+
+    [Fact]
+    public void FailedCopyCannotRemoveAnExistingDestination()
+    {
+        string root = NewPath("fallback-collision");
+        Directory.CreateDirectory(root);
+        string input = Path.Combine(root, "input.czi");
+        string output = Path.Combine(root, "output.czi");
+        string temporary = Path.Combine(root, "our-owned-output");
+        File.WriteAllText(input, "read-only source");
+        File.SetAttributes(input, FileAttributes.ReadOnly);
+        File.WriteAllText(output, "valuable existing destination");
+        try
+        {
+            var fs = new FileSystem();
+            string error = new FileProcessingFailedHandler().FileProcessingFailed(
+                fs.FileInfo.New(input),
+                fs.FileInfo.New(output),
+                fs.FileInfo.New(temporary),
+                _ => { },
+                "Processing failed",
+                true,
+                CancellationToken.None);
+
+            error.Should().Contain(FileProcessingFailedHandler.FailedCopyMessage);
+            File.ReadAllText(output).Should().Be("valuable existing destination");
+            File.ReadAllText(input).Should().Be("read-only source");
+            File.Exists(temporary).Should().BeFalse();
+        }
+        finally
+        {
+            File.SetAttributes(input, FileAttributes.Normal);
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RealDirectoryAliasCannotRecursivelyCopyOutputIntoItself()
+    {
+        string root = NewPath("alias-regression");
+        string input = Path.Combine(root, "input");
+        string target = Path.Combine(input, "output");
+        string alias = Path.Combine(root, "alias");
+        Directory.CreateDirectory(target);
+        File.WriteAllText(Path.Combine(target, "sentinel.txt"), "valuable sentinel");
+        try
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                var start = new System.Diagnostics.ProcessStartInfo("cmd.exe")
+                {
+                    UseShellExecute = false, CreateNoWindow = true,
+                    RedirectStandardOutput = true, RedirectStandardError = true,
+                };
+                foreach (string argument in new[] { "/c", "mklink", "/J", alias, target })
+                {
+                    start.ArgumentList.Add(argument);
+                }
+
+                using var process = System.Diagnostics.Process.Start(start)!;
+                string diagnostic = await process.StandardError.ReadToEndAsync();
+                await process.WaitForExitAsync();
+                process.ExitCode.Should().Be(0, diagnostic);
+            }
+            else
+            {
+                Directory.CreateSymbolicLink(alias, target);
+            }
+
+            Func<Task> run = () => Run(new FileSystem(), input, alias);
+            await run.Should().ThrowAsync<IOException>().WithMessage("*Linked folders*");
+            File.ReadAllText(Path.Combine(target, "sentinel.txt")).Should().Be("valuable sentinel");
+            Directory.GetFileSystemEntries(target).Should().ContainSingle();
+        }
+        finally
+        {
+            if (Directory.Exists(alias))
+            {
+                Directory.Delete(alias, recursive: false);
+            }
+
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task CopyOtherFiles_RealFilesAndNativeCompressionProduceCompleteDestination()
     {
@@ -246,7 +459,11 @@ public class CopyOtherFilesTests
         prepare.Should().Throw<ArgumentException>().WithMessage("*must be different*");
     }
 
-    private static string NewPath(string name) => Path.Combine(Path.GetTempPath(), "CziShrinkCopyTests", Guid.NewGuid().ToString(), name);
+    private static string NewPath(string name) => Path.Combine(
+        Environment.GetEnvironmentVariable("CZISHRINK_TEST_DIRECTORY") ?? Path.GetTempPath(),
+        "CziShrinkCopyTests",
+        Guid.NewGuid().ToString(),
+        name);
 
     private static async Task<List<CompressorMessage.FileFinished>> Run(
         IFileSystem fs,

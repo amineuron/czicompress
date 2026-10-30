@@ -76,7 +76,6 @@ public class FileProcessingFailedHandler
         catch (Exception)
         {
             // Remove partially written file
-            _ = TryDelete(outFile);
             _ = TryDelete(tempOutFile);
             return false;
         }
@@ -91,7 +90,7 @@ public class FileProcessingFailedHandler
         long totalBytesWritten = 0;
         int bufferLength = 1024 * 1024;
         byte[] buffer = new byte[bufferLength];
-        using var inStream = new FileStream(inPath, FileMode.Open);
+        using var inStream = new FileStream(inPath, FileMode.Open, FileAccess.Read, FileShare.Read);
         using var tempOutStream = new FileStream(outPath, FileMode.CreateNew);
 
         int bytesRead = inStream.Read(buffer, 0, bufferLength);
