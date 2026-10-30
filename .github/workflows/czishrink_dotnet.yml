@@ -122,6 +122,15 @@ jobs:
         # Use always() to also publish test results when there are test failures
         if: ${{ always() }}
 
+      - name: Prepare and validate optional HDF5 and TIFF tools
+        if: ${{ matrix.build == 'Release' && matrix.config.os == 'windows-latest' }}
+        shell: pwsh
+        run: |
+          ./ScientificFormats/prepare-windows-tools.ps1
+          $env:CZISHRINK_FORMAT_TOOLS = (Resolve-Path ../artifacts/hdf5-tiff-tools).Path
+          & "$env:CZISHRINK_FORMAT_TOOLS/python/python.exe" -B ScientificFormats/tests/test_formats.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Scientific codec validation failed' }
+
       - name: Publish
         if: matrix.build == 'Release'
         run: >

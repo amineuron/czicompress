@@ -20,6 +20,33 @@ using netczicompressTests.Models.Mocks;
 /// <content>Tests for <see cref="MainViewModel.StartCommand"/>.</content>
 public partial class MainViewModelTests
 {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task StartCommand_RejectsLinkedPathsBeforeCreatingTheOutputFolder(bool inputIsLinked)
+    {
+        IFixture fixture = CreateFixture();
+        IFileSystem fs = NewMockFileSystem();
+        fixture.Inject(fs);
+        var compressor = fixture.Freeze<Mock<IFolderCompressor>>();
+        var sut = fixture.Create<MainViewModel>();
+        SetFolders(sut, fs);
+        var linked = fs.Directory.CreateDirectory(fs.Path.Combine(fs.Path.GetDirectoryName(sut.InputDirectory)!, Guid.NewGuid().ToString("N")));
+        linked.Attributes |= FileAttributes.ReparsePoint;
+        if (inputIsLinked)
+        {
+            sut.InputDirectory = linked.FullName;
+        }
+
+        sut.OutputDirectory = fs.Path.Combine(inputIsLinked ? linked.Parent!.FullName : linked.FullName, "must-not-create");
+
+        await sut.StartCommand.Execute(default).ToTask();
+
+        sut.OverallStatus.Should().Contain("Linked folders");
+        fs.Directory.Exists(sut.OutputDirectory).Should().BeFalse();
+        compressor.Verify(p => p.PrepareNewRun(It.IsAny<FolderCompressorParameters>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [Fact]
     public void StartCommand_WhenInputFolderNotSet_CannotExecute()
     {
@@ -166,7 +193,7 @@ public partial class MainViewModelTests
 
     [Theory]
     [AutoData]
-    public async Task StartCommands_WhenProcessingStarts_UsesCorrectParameters(OperationMode selectedMode, bool recursive)
+    public async Task StartCommands_WhenProcessingStarts_UsesCorrectParameters(OperationMode selectedMode, bool recursive, bool hdf5, bool tiff)
     {
         // ARRANGE
         IFixture fixture = CreateFixture();
@@ -178,6 +205,8 @@ public partial class MainViewModelTests
         SetFolders(sut, fs);
         sut.SelectedMode = selectedMode;
         sut.Recursive = recursive;
+        sut.ProcessHdf5 = hdf5;
+        sut.ProcessTiff = tiff;
 
         // ACT
         var startCommandTask = sut.StartCommand.Execute(default).ToTask();
@@ -191,7 +220,8 @@ public partial class MainViewModelTests
                         object.ReferenceEquals(x.InputDir.FileSystem, fs) &&
                         object.ReferenceEquals(x.OutputDir.FileSystem, fs) &&
                         x.Recursive == recursive &&
-                        x.Mode == selectedMode.Value),
+                        x.Mode == selectedMode.Value &&
+                        x.ProcessingOptions.ProcessHdf5 == hdf5 && x.ProcessingOptions.ProcessTiff == tiff),
                 It.Is<CancellationToken>(t => !t.IsCancellationRequested)),
             Times.Once);
 
@@ -203,7 +233,7 @@ public partial class MainViewModelTests
 
     [Theory]
     [AutoData]
-    public async Task StartCommands_WhenProcessingStarts_LogsCorrectParameters(OperationMode selectedMode, bool recursive)
+    public async Task StartCommands_WhenProcessingStarts_LogsCorrectParameters(OperationMode selectedMode, bool recursive, bool hdf5, bool tiff)
     {
         // ARRANGE
         IFixture fixture = CreateFixture();
@@ -216,6 +246,8 @@ public partial class MainViewModelTests
         SetFolders(sut, fs);
         sut.SelectedMode = selectedMode;
         sut.Recursive = recursive;
+        sut.ProcessHdf5 = hdf5;
+        sut.ProcessTiff = tiff;
 
         // ACT
         var startCommandTask = sut.StartCommand.Execute(default).ToTask();
@@ -223,7 +255,7 @@ public partial class MainViewModelTests
         // ASSERT
         loggerMock.VerifySingleEntry(
             Microsoft.Extensions.Logging.LogLevel.Information,
-            $"Starting run: FolderCompressorParameters {{ InputDir = {sut.InputDirectory}, OutputDir = {sut.OutputDirectory}, Recursive = {recursive}, Mode = {selectedMode.Value}, ExecutionOptions = ExecutionOptions {{ ThreadCount = {sut.ThreadCount} }}, ProcessingOptions = ProcessingOptions {{ CompressionLevel = {sut.CompressionLevel}, CopyFailedFiles = {sut.CopyFailedFiles} }} }}");
+            $"Starting run: FolderCompressorParameters {{ InputDir = {sut.InputDirectory}, OutputDir = {sut.OutputDirectory}, Recursive = {recursive}, Mode = {selectedMode.Value}, ExecutionOptions = ExecutionOptions {{ ThreadCount = {sut.ThreadCount} }}, ProcessingOptions = ProcessingOptions {{ CompressionLevel = {sut.CompressionLevel}, CopyFailedFiles = {sut.CopyFailedFiles}, ProcessHdf5 = {sut.ProcessHdf5}, ProcessTiff = {sut.ProcessTiff}, HasScientificFormats = {hdf5 || tiff} }} }}");
 
         // CLEANUP
         await sut.StopCommand.Execute(default);

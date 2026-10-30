@@ -9,4 +9,19 @@ namespace netczicompress.Models;
 /// </summary>
 /// <param name="CompressionLevel">Level of compression to use, if applicable.</param>
 /// <param name="CopyFailedFiles">A value indicating whether failed files should be copied to the destination folder.</param>
-public record ProcessingOptions(CompressionLevel CompressionLevel, bool CopyFailedFiles = false);
+public record ProcessingOptions(CompressionLevel CompressionLevel, bool CopyFailedFiles = false)
+{
+    public bool ProcessHdf5 { get; init; }
+
+    public bool ProcessTiff { get; init; }
+
+    public bool HasScientificFormats => this.ProcessHdf5 || this.ProcessTiff;
+
+    public bool ProcessesExtension(string extension) => extension.ToLowerInvariant() switch
+    {
+        ".czi" => true,
+        ".h5" or ".hdf5" => this.ProcessHdf5,
+        ".tif" or ".tiff" => this.ProcessTiff,
+        _ => false,
+    };
+}

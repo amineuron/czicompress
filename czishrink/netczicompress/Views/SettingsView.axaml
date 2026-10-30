@@ -38,7 +38,7 @@
                 Grid.Column="2"
                 VerticalAlignment="Center"
                 IsChecked="{Binding Recursive}"
-                ToolTip.Tip="Look for CZI files in the Input directory and all the directories that it contains recursively." />
+                ToolTip.Tip="Include files in all subfolders of the input directory." />
         </Grid>
 
         <Label

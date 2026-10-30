@@ -27,6 +27,8 @@ public record CompressorMessage
             string? ErrorMessage)
         : CompressorMessage
     {
+        public ProcessingDetails? Details { get; init; }
+
         public decimal SizeRatio { get; } = SizeInput != 0 ? (decimal)SizeOutput / SizeInput : 0;
 
         public long SizeDelta { get; } = SizeOutput - SizeInput;

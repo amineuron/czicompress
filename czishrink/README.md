@@ -43,6 +43,18 @@ There is currently no way to manually set this.
 Input and output folders are selected, and the tool will operate on all CZI-documents within the input folder.
 The intent of the tool is to be a bulk-compression utility.
 
+### Optional HDF5 and TIFF
+
+The advanced options can also enable HDF5 (`.h5`, `.hdf5`) and TIFF/OME-TIFF
+(`.tif`, `.tiff`) compression and decompression. Both default to off. Outputs stay
+in their native formats, using lossless gzip/shuffle for HDF5 and Deflate for TIFF.
+Decoded data and metadata are checked; repacked container bytes can differ.
+Inputs remain read-only and results use new files in the destination folder.
+The CSV appends format, method, verification, hashes and output path to the original
+eight columns. See [support limits and runtime setup](ScientificFormats/README.md).
+
+Contributed by Amin Khosrozadeh, PhD — Prof. Vassiliki Nikoletopoulou lab, DNF, UNIL.
+
 ## Parameters
 
 ### Operations

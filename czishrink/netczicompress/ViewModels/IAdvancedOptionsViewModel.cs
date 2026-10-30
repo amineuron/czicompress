@@ -25,4 +25,8 @@ public interface IAdvancedOptionsViewModel
     /// Gets or sets a value indicating whether failed files should be copied to the destination folder.
     /// </summary>
     public bool CopyFailedFiles { get; set; }
+
+    public bool ProcessHdf5 { get; set; }
+
+    public bool ProcessTiff { get; set; }
 }

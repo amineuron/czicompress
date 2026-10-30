@@ -134,6 +134,14 @@ public class MainViewModel : ViewModelBase,
     public bool CopyFailedFiles { get; set; } = false;
 
     /// <inheritdoc/>
+    [Reactive]
+    public bool ProcessHdf5 { get; set; }
+
+    /// <inheritdoc/>
+    [Reactive]
+    public bool ProcessTiff { get; set; }
+
+    /// <inheritdoc/>
     public IEnumerable Modes { get; }
 
     public bool CanStop => this.CanStopHelper.Value;
@@ -216,6 +224,8 @@ public class MainViewModel : ViewModelBase,
 
         var result = this.fileSystem.DirectoryInfo.New(directory);
 
+        ProcessingPathValidation.RejectLinkedDirectories(result);
+
         if (!result.Exists)
         {
             if (createIfNecessary)
@@ -233,7 +243,11 @@ public class MainViewModel : ViewModelBase,
 
     private (ProcessingOptions ProcessingOptions, ExecutionOptions ExecutionOptions) CollectAdvancedCompressionOptions()
     {
-        ProcessingOptions processingOptions = new(this.CompressionLevel, this.CopyFailedFiles);
+        ProcessingOptions processingOptions = new(this.CompressionLevel, this.CopyFailedFiles)
+        {
+            ProcessHdf5 = this.ProcessHdf5,
+            ProcessTiff = this.ProcessTiff,
+        };
         ExecutionOptions executionOptions = new(this.ThreadCount);
         return (processingOptions, executionOptions);
     }

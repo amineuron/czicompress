@@ -58,10 +58,10 @@ public class CsvLogFileWriterTests
         csvFileRows.Should().BeEquivalentTo(
         new[]
         {
-            "InputFile,SizeInput,SizeOutput,SizeRatio,SizeDelta,TimeToProcess,Status,ErrorMessage",
-            "\"foo/bla/bla.czi\",100,16,0.16,-84,00:00:00,SUCCESS,",
-            "\"foo/bla/blub.czi\",1000,1600,1.6,600,00:00:00,SUCCESS,",
-            "\"bar/bla/baz,; .CZI\",1000,1600,,,,ERROR,\"oops\nHere's another line.\"",
+            "InputFile,SizeInput,SizeOutput,SizeRatio,SizeDelta,TimeToProcess,Status,ErrorMessage,FileFormat,Operation,Method,Action,Verification,ContainerByteIdentical,InputSHA256,OutputSHA256,OutputFile",
+            "\"foo/bla/bla.czi\",100,16,0.16,-84,00:00:00,SUCCESS,,\"CZI\",,,,,,,,",
+            "\"foo/bla/blub.czi\",1000,1600,1.6,600,00:00:00,SUCCESS,,\"CZI\",,,,,,,,",
+            "\"bar/bla/baz,; .CZI\",1000,1600,,,,ERROR,\"oops\nHere's another line.\",\"CZI\",,,,,,,,",
             string.Empty,
         });
     }
@@ -96,8 +96,26 @@ public class CsvLogFileWriterTests
         csvFileRows.Should().BeEquivalentTo(
         new[]
         {
-            "InputFile,SizeInput,SizeOutput,SizeRatio,SizeDelta,TimeToProcess,Status,ErrorMessage",
+            "InputFile,SizeInput,SizeOutput,SizeRatio,SizeDelta,TimeToProcess,Status,ErrorMessage,FileFormat,Operation,Method,Action,Verification,ContainerByteIdentical,InputSHA256,OutputSHA256,OutputFile",
             string.Empty,
         });
+    }
+
+    [Fact]
+    public void ReportIncludesActualCodecVerificationHashesAndDestination()
+    {
+        using var writer = new StringWriter();
+        var logger = new CsvLogFileWriter(writer);
+        var message = new CompressorMessage.FileFinished(Mock.Of<IFileInfo>(file => file.FullName == "input/sample.h5"), 100, 30, TimeSpan.Zero, null)
+        {
+            Details = new ProcessingDetails(
+                "H5", "CompressAll", "gzip+shuffle", "Compressed", "h5diff datasets and attributes verified", false, "input-hash", "output-hash", "destination/sample.h5"),
+        };
+
+        logger.OnNext(message);
+        logger.OnCompleted();
+
+        writer.ToString().Should().Contain(
+            "\"H5\",\"CompressAll\",\"gzip+shuffle\",\"Compressed\",\"h5diff datasets and attributes verified\",False,\"input-hash\",\"output-hash\",\"destination/sample.h5\"");
     }
 }

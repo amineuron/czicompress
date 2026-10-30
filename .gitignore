@@ -438,3 +438,5 @@ FodyWeavers.xsd
 
 # Be able to commit local nupkg
 !czishrink/packages_local/*.nupkg
+
+/artifacts/
