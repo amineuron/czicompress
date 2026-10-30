@@ -1,6 +1,9 @@
-// SPDX-FileCopyrightText: 2026 czicompress contributors
+// SPDX-FileCopyrightText: 2026 Amin Khosrozadeh
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
+//
+// Contributor: Amin Khosrozadeh, PhD.
+// Affiliation: Prof. Vassiliki Nikoletopoulou lab, DNF, UNIL.
 
 namespace netczicompress.Models;
 

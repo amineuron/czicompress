@@ -1,4 +1,4 @@
-# CziShrink
+﻿# CziShrink
 An open source and cross-platform GUI for [CziCompress](https://github.com/ZEISS/czicompress), made with Avalonia UI and .NET.
 
 ## Table of contents
@@ -78,6 +78,8 @@ file layout and may change storage filters, so a decompressed container is not
 necessarily byte-identical to the original. Use a byte-preserving archive when
 exact restoration of the original file bytes is required. Inputs are never edited;
 outputs and CSV reports are written only to the selected destination.
+
+Contributed by Amin Khosrozadeh, PhD ? Prof. Vassiliki Nikoletopoulou lab, DNF, UNIL.
 
 ## Parameters
 
