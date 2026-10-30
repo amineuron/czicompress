@@ -1,4 +1,4 @@
-# CziShrink
+﻿# CziShrink
 An open source and cross-platform GUI for [CziCompress](https://github.com/ZEISS/czicompress), made with Avalonia UI and .NET.
 
 ## Table of contents
@@ -58,6 +58,8 @@ is reported in the error list and CSV while unrelated folders continue processin
 **Copy CZI files that fail processing** is a separate option: it tries to copy the
 original CZI unchanged if compression or decompression fails. It does not control
 whether TIFFs or other file types are included.
+
+Contributed by Amin Khosrozadeh, PhD ? Prof. Vassiliki Nikoletopoulou lab, DNF, UNIL.
 
 ## Parameters
 
