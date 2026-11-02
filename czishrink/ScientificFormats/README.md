@@ -1,11 +1,12 @@
-# Combined CZI, HDF5, TIFF and accompanying-file copying
+# Optional HDF5 and TIFF processing
 
 Contributor: **Amin Khosrozadeh, PhD** — Prof. Vassiliki Nikoletopoulou lab,
 DNF, University of Lausanne (UNIL).
 [Lab](https://dnf-unil.ch/group/autophagic-mechanisms-of-protein-homeostasis-in-neurons/member/nikoletopoulou-vassiliki-nikoletopoulou)
 
 Enable **Process HDF5** and/or **Process TIFF / OME-TIFF** in advanced options.
-Both default to off. CZI retains its native engine. Compressed results keep their
+Both default to off. **Copy other files and folders**, the second advanced option,
+includes accompanying files and empty folders in this combined distribution. CZI retains its native engine. Compressed results keep their
 original extensions and can be read by software supporting the chosen codec.
 **Decompress all data** removes supported compression in the same native formats.
 Levels are clamped to 1–9 for these formats; CZI retains its original range.
@@ -16,13 +17,20 @@ compared bit-for-bit in bounded blocks, including floating-point NaN payloads an
 signed zeros. External links/storage, virtual datasets and user-block metadata
 are rejected. Long filter lists use an options file; very long lists containing
 whitespace in dataset names are unsupported. Default compression modes leave
-already-filtered datasets alone; **Compress all data** recompresses supported data.
+already-compressed datasets alone; checksum/shuffle-only datasets remain eligible.
+**Compress all data** recompresses supported data.
 
 TIFF uses `tifffile`/`imagecodecs` for lossless Deflate and suitable predictors.
 Tests cover ordinary TIFF, BigTIFF, OME, multiple pages, SubIFD pyramids, private
 tags, palette/RGB data and floating-point bits. Every page's pixels and metadata
-are checked. Storage tags and offsets are regenerated. Unsupported proprietary
-layouts, EXIF/GPS pointers and implicit ImageJ hyperstacks fail explicitly.
+are checked, including resolution and calibration units. Storage tags and offsets
+are regenerated; unknown IFD/IFD8 pointers are rejected. Pixel processing uses
+private disk-backed mappings, bounded comparison blocks and 256-pixel output
+tiles. Compressed strips/tiles exceeding the 64 MiB decode limit are rejected;
+scratch disk space is needed for decoded pages. Unsupported proprietary layouts,
+EXIF/GPS pointers, volumetric pages and implicit ImageJ hyperstacks fail explicitly.
+In **Compress uncompressed**, fully compressed TIFFs are copied unchanged and
+mixed-compression TIFFs report unsupported; use **Compress all** for mixed files.
 
 Inputs are opened read-only. Private destination staging space prevents overwrites
 and preserves existing files. Dry Run bypasses staging. Cancellation kills and
@@ -35,7 +43,8 @@ CZI reports explicitly state that its pixels are not independently verified.
 HDF5-based BigDataViewer and OME-TIFF occur in microscopy workflows supported by
 [ZEISS arivis Pro](https://www.zeiss.com/microscopy/en/products/software/arivis-pro.html?hsLang=en).
 [BigDataViewer documents XML/HDF5 and a ZEISS Lightsheet Z.1 example](https://imagej.net/plugins/bdv/).
-For paired datasets, keep companion XML files and relative paths together; enable **Copy other files and folders** to copy accompanying files in this combined build. Generic HDF5/TIFF
+For paired datasets, keep companion XML files and relative paths together; copying
+accompanying files is the separate feature proposed in PR #114. Generic HDF5/TIFF
 checks do not establish compatibility with every vendor-specific reader.
 ZEISS viewer validation remains a manual follow-up.
 

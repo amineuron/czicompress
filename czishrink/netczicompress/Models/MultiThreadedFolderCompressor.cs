@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Carl Zeiss Microscopy GmbH
+// SPDX-FileCopyrightText: 2023 Carl Zeiss Microscopy GmbH
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -355,6 +355,7 @@ public class MultiThreadedFolderCompressor(
             details = (processor as IProcessingDetailsSource)?.LastDetails;
             processedByProcessor = true;
             var elapsedTime = Stopwatch.GetElapsedTime(startTimestamp);
+            token.ThrowIfCancellationRequested();
             temporaryFile.MoveToOutFileIfExists();
             return MakeTheReturnValue(timeElapsed: elapsedTime, errorMessage: null);
         }

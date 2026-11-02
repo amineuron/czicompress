@@ -1,9 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Amin Khosrozadeh
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
-//
-// Contributor: Amin Khosrozadeh, PhD.
-// Affiliation: Prof. Vassiliki Nikoletopoulou lab, DNF, UNIL.
 
 namespace netczicompress.Models;
 
@@ -11,7 +8,7 @@ using System.IO.Abstractions;
 using System.Security.Cryptography;
 
 /// <summary>
-/// Copies a non-CZI file unchanged, with progress reporting and cancellation.
+/// Copies an original file unchanged, with progress reporting and cancellation.
 /// </summary>
 public sealed class CopyFileProcessor(IFileSystem fileSystem) : IFileProcessor, IProcessingDetailsSource
 {
@@ -45,7 +42,7 @@ public sealed class CopyFileProcessor(IFileSystem fileSystem) : IFileProcessor, 
         string outputSha;
         using (var copied = fileSystem.FileStream.New(outputPath, FileMode.Open, FileAccess.Read, FileShare.Read))
         {
-            outputSha = Convert.ToHexString(SHA256.HashData(copied));
+            outputSha = FileIntegrity.ComputeSha256(copied, token);
         }
 
         if (inputSha != outputSha)
@@ -64,6 +61,7 @@ public sealed class CopyFileProcessor(IFileSystem fileSystem) : IFileProcessor, 
             inputSha,
             outputSha);
         progressReport(100);
+        token.ThrowIfCancellationRequested();
     }
 
     public void Dispose()
